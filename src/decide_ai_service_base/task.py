@@ -257,3 +257,102 @@ class Task(ABC):
             source_text = self.fetch_expression_data(source_uri)
 
         return source_uri, source_text
+
+
+class DecisionTask(Task, ABC):
+    """Task that processes decision-making data with input and output containers."""
+
+    def __init__(self, task_uri: str):
+        super().__init__(task_uri)
+        self.source_graph: Optional[str] = None
+
+        q = Template(
+            get_prefixes_for_query("dct", "task", "nfo") +
+            """
+        SELECT ?source WHERE {
+          VALUES ?t {
+            $task
+          }
+          ?t a task:Task .
+          OPTIONAL { 
+            ?t task:inputContainer ?ic . 
+            OPTIONAL { ?ic a nfo:DataContainer ; task:hasResource ?source . }
+          }
+        }
+        """).substitute(task=sparql_escape_uri(task_uri))
+        r = query(q, sudo=True)
+        bindings = r.get("results", {}).get("bindings", [])
+        if not bindings or "source" not in bindings[0] or "value" not in bindings[0].get("source", {}):
+            raise ValueError(f"No source found for task {task_uri}")
+        self.source = bindings[0]["source"]["value"]
+
+    def fetch_data(self) -> str:
+        """Retrieve the input data for this task from the triplestore."""
+        query_template = Template(
+            get_prefixes_for_query("eli", "eli-dl", "dct", "epvoc") +
+            """
+            SELECT DISTINCT ?graph ?title ?description ?decision_basis ?content ?lang
+            WHERE {
+              GRAPH ?graph {
+                VALUES ?s {
+                  $source
+                }
+                ?s a ?thing .
+                OPTIONAL { ?s eli:title ?title }
+                OPTIONAL { ?s eli:description ?description }
+                OPTIONAL { ?s eli-dl:decision_basis ?decision_basis }
+                OPTIONAL { ?s epvoc:expressionContent ?content }
+                OPTIONAL { ?s dct:language ?lang }
+              }
+            }
+        """)
+
+        query_result = query(query_template.substitute(
+            source=sparql_escape_uri(self.source)
+        ), sudo=True)
+
+        bindings = query_result.get("results", {}).get("bindings", [])
+        texts: list[str] = []
+        seen = set()
+        for binding in bindings:
+            # Cache the graph of the source expression so we can reuse it later
+            if not self.source_graph:
+                self.source_graph = binding.get("graph", {}).get("value")
+            for field in ("content", "title", "description", "decision_basis"):
+                value = binding.get(field, {}).get("value")
+                if value and value not in seen:
+                    texts.append(value)
+                    seen.add(value)
+
+        return "\n".join(texts)
+
+    def fetch_work_uri(self) -> Optional[str]:
+        """
+        Retrieve the eli:work realized by this expression, if available.
+        """
+        query_template = Template(
+            get_prefixes_for_query("eli") +
+            """
+            SELECT ?work WHERE {
+              GRAPH ?g {
+                $source eli:realizes ?work .
+              }
+            }
+            LIMIT 1
+            """
+        )
+
+        query_result = query(
+            query_template.substitute(source=sparql_escape_uri(self.source)),
+            sudo=True
+        )
+        bindings = query_result.get("results", {}).get("bindings", [])
+        if bindings and "work" in bindings[0]:
+            work_uri = bindings[0]["work"]["value"]
+            self.logger.info(
+                f"Found work {work_uri} for expression {self.source}")
+            return work_uri
+
+        self.logger.warning(
+            f"No eli:realizes work found for expression {self.source}")
+        return None
