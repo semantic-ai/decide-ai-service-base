@@ -1,10 +1,12 @@
 from pathlib import Path
 from pydantic import ValidationError, BaseModel
-from typing import Type
+from typing import Type, TypeVar
 import json
 
+T = TypeVar('T', bound=BaseModel)
 
-def load_config(application_config_cls: Type[BaseModel], config_path: str | Path | None = None) -> BaseModel:
+
+def load_config(application_config_cls: Type[T], config_path: str | Path | None = None) -> T:
     """
     Load and validate configuration from config.json.
 
