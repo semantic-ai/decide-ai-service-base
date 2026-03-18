@@ -2,6 +2,7 @@ from pathlib import Path
 from pydantic import ValidationError, BaseModel
 from typing import Type, TypeVar
 import json
+import os
 
 T = TypeVar('T', bound=BaseModel)
 
@@ -26,9 +27,7 @@ def load_config(application_config_cls: Type[T], config_path: str | Path | None 
 
     # Determine config file path
     if config_path is None:
-        src_dir = Path(__file__).resolve().parent
-        project_root = src_dir.parent
-        config_path = project_root / "config.json"
+        config_path = Path(os.getenv("CONFIG_PATH", "config.json")).resolve()
     else:
         config_path = Path(config_path).resolve()
 
