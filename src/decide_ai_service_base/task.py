@@ -60,37 +60,49 @@ class Task(ABC):
         raise RuntimeError("Task with uri {0} not found".format(task_uri))
 
     def change_state(self, new_state: str) -> None:
-        """Update the task status in the triplestore.
-        Always deletes any existing status before inserting the new one,
-        avoiding duplicate statuses if the task had an unexpected state."""
-        # Update the task status
-        status_query = Template(
+        """Update the task status in the triplestore."""
+
+        # 1. Delete any existing status
+        delete_query = Template(
             get_prefixes_for_query("task", "adms") +
             """
             DELETE {
             GRAPH <""" + GRAPHS["jobs"] + """> {
-                ?task adms:status ?oldStatus .
+                ?task adms:status ?status .
             }
             }
+            WHERE {
+            GRAPH <""" + GRAPHS["jobs"] + """> {
+                BIND($task AS ?task)
+                ?task adms:status ?status .
+            }
+            }
+            """
+        )
+
+        update(delete_query.substitute(
+            task=sparql_escape_uri(self.task_uri)
+        ), sudo=True)
+
+        # 2. Insert the new status
+        insert_query = Template(
+            get_prefixes_for_query("task", "adms") +
+            """
             INSERT {
             GRAPH <""" + GRAPHS["jobs"] + """> {
                 ?task adms:status <$new_status> .
             }
             }
             WHERE {
-            GRAPH <""" + GRAPHS["jobs"] + """> {
                 BIND($task AS ?task)
-                OPTIONAL { ?task adms:status ?oldStatus . }
-            }
             }
             """
         )
-        query_string = status_query.substitute(
+
+        update(insert_query.substitute(
             new_status=JOB_STATUSES[new_state],
             task=sparql_escape_uri(self.task_uri)
-        )
-
-        update(query_string, sudo=True)
+        ), sudo=True)
 
         # Batch-insert results containers (if any)
         if self.results_container_uris:
@@ -283,8 +295,10 @@ class DecisionTask(Task, ABC):
         r = query(q, sudo=True)
         bindings = r.get("results", {}).get("bindings", [])
         if not bindings or "source" not in bindings[0] or "value" not in bindings[0].get("source", {}):
-            raise ValueError(f"No source found for task {task_uri}")
-        self.source = bindings[0]["source"]["value"]
+            self.logger.warning(f"No source found for task {task_uri}")
+            self.source = None
+        else:
+            self.source = bindings[0]["source"]["value"]
 
     def fetch_data(self) -> str:
         """Retrieve the input data for this task from the triplestore."""

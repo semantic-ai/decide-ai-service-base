@@ -18,6 +18,7 @@ class Annotation(ABC):
         self.source_uri = source_uri
         self.agent = agent
         self.agent_type = agent_type
+        self.logger = logging.getLogger(__name__)
 
     @abstractmethod
     def add_to_triplestore(self):
@@ -121,7 +122,6 @@ class LinkingAnnotation(Annotation):
         try:
             update(query_string, sudo=True)
         except Exception as e:
-            self.logger = logging.getLogger(self.__class__.__name__)
             error_msg = f"Failed to insert LinkingAnnotation to triplestore for source {self.source_uri}: {e}"
             self.logger.error(error_msg, exc_info=True)
             raise RuntimeError(error_msg) from e
@@ -244,7 +244,6 @@ class NERAnnotation(Annotation):
         try:
             update(query_string, sudo=True)
         except Exception as e:
-            self.logger = logging.getLogger(self.__class__.__name__)
             error_msg = f"Failed to insert NERAnnotation to triplestore for source {self.source_uri}: {e}"
             self.logger.error(error_msg, exc_info=True)
             raise RuntimeError(error_msg) from e
@@ -285,6 +284,65 @@ class NERAnnotation(Annotation):
                         oa:source {uri} .
                     FILTER NOT EXISTS {{ ?existingTarget oa:selector ?anySelector . }}"""
         return selector_part, selector_filter
+    
+    def _build_skolem_parts(self, skolem_uuid: str, subject: str, predicate: str, object: str, entity_class: Optional[str]) -> tuple[str, str]:
+        """
+        Helper method to build skolem SPARQL parts.
+
+        Args:
+            skolem_uuid: The escaped URI for the skolemized statement
+            subject: The escaped subject URI
+            predicate: The predicate (already escaped or prefixed)
+            object: The escaped object (URI or literal)
+            entity_class: Optional entity class to determine additional triples
+
+        Returns:
+            A tuple of (skolem_parts, skolem_filter) strings to be included in the SPARQL query
+        """
+        sparql_class = None
+        if entity_class and "date" not in entity_class.lower():
+            if entity_class == "MANDATARY":
+                sparql_class = "foaf:Person"
+            elif entity_class == "ADMINISTRATIVE_BODY":
+                sparql_class = "org:Organization"
+
+        if sparql_class:
+            entity_class_uuid = f"skolem:{uuid.uuid4()}"
+
+            skolem_parts = f"""
+                {skolem_uuid} a rdf:Statement ;
+                  rdf:subject {subject} ;
+                  rdf:predicate {predicate} ;
+                  rdf:object {entity_class_uuid} .
+
+                {entity_class_uuid} a {sparql_class} ;
+                  rdfs:label {object} .
+                """
+            skolem_filter = f"""
+                ?existingSkolem a rdf:Statement ;
+                  rdf:subject {subject} ;
+                  rdf:predicate {predicate} ;
+                  rdf:object ?existingObject .
+
+                ?existingObject a {sparql_class} ;
+                  rdfs:label {object} .
+                """
+
+        else:
+            skolem_parts = f"""
+                {skolem_uuid} a rdf:Statement ;
+                  rdf:subject {subject} ;
+                  rdf:predicate {predicate} ;
+                  rdf:object {object} .
+                """
+            skolem_filter = f"""
+                ?existingSkolem a rdf:Statement ;
+                  rdf:subject {subject} ;
+                  rdf:predicate {predicate} ;
+                  rdf:object {object} .
+                """
+
+        return skolem_parts, skolem_filter
 
     def get_extra_inserts(self) -> str:
         """Return additional SPARQL triples to insert for this annotation type."""
@@ -369,13 +427,15 @@ class GeoAnnotation(NERAnnotation):
 class TripletAnnotation(NERAnnotation):
     """NER annotation representing an RDF statement (subject-predicate-object triple)."""
 
-    def __init__(self, subject: str, predicate: str, obj: str, activity_id: str, source_uri: str, start: Optional[int],
-                 end: Optional[int], agent: str, agent_type: str, confidence: float = 1.0):
+    def __init__(self, subject: str, predicate: str, obj: str, activity_id: str, source_uri: str,
+                 start: Optional[int], end: Optional[int], agent: str, agent_type: str,
+                 confidence: float = 1.0, entity_class: Optional[str] = None):
         super().__init__(activity_id, source_uri, predicate, start, end, agent, agent_type)
         self.predicate = predicate
         self.object = obj
         self.subject = subject
         self.confidence = confidence
+        self.entity_class = entity_class
 
     @classmethod
     def create_from_uri(cls, uri: str) -> Iterator['TripletAnnotation']:
@@ -426,7 +486,7 @@ class TripletAnnotation(NERAnnotation):
     def add_to_triplestore(self) -> str:
         """
         Insert this annotation into the triplestore.
-
+        
         Returns:
             The URI of the created annotation
         """
@@ -434,11 +494,17 @@ class TripletAnnotation(NERAnnotation):
         part_of_id = sparql_escape_uri("http://www.example.org/id/.well-known/genid/{0}".format(uuid.uuid4()))
         uri = sparql_escape_uri(self.source_uri)
 
+        # Build skolem parts with actual values substituted
+        skolem_uuid = f"skolem:{uuid.uuid4()}"
+        skolem_parts, skolem_filter = self._build_skolem_parts(skolem_uuid, sparql_escape_uri(
+            self.subject), self.predicate, self.object, self.entity_class)
+
         # Build selector parts with actual values substituted
-        selector_part, selector_filter = self._build_selector_parts(part_of_id, uri)
+        selector_part, selector_filter = self._build_selector_parts(
+            part_of_id, uri)
 
         query_template = Template(
-            get_prefixes_for_query("ex", "oa", "mu", "prov", "foaf", "dct", "skolem", "nif", "rdf", "eli") +
+            get_prefixes_for_query("ex", "oa", "mu", "prov", "foaf", "dct", "skolem", "nif", "rdf", "eli", "org", "rdfs") +
             """
             INSERT {
               GRAPH <""" + GRAPHS["ai"] + """> {
@@ -452,12 +518,8 @@ class TripletAnnotation(NERAnnotation):
                      nif:confidence $confidence ;
                      oa:motivatedBy oa:linking ;
                      oa:hasTarget $part_of_id .
-
-                  $skolem a rdf:Statement ;
-                    rdf:subject $subject ;
-                    rdf:predicate $pred ;
-                    rdf:object $obj .
-                    $selector_part
+                  $skolem_parts
+                  $selector_part
               }
             } WHERE {
               GRAPH <""" + GRAPHS["ai"] + """> {
@@ -470,12 +532,9 @@ class TripletAnnotation(NERAnnotation):
                     ?existingAct a prov:Activity ;
                          prov:generated ?existingAnn ;
                          prov:wasAssociatedWith $user .
-
-                    ?existingSkolem a rdf:Statement ;
-                      rdf:subject $subject ;
-                      rdf:predicate $pred ;
-                      rdf:object $obj .
-                      $selector_filter
+                    
+                    $skolem_filter
+                    $selector_filter
                   }
               }
             }
@@ -485,19 +544,20 @@ class TripletAnnotation(NERAnnotation):
             annotation_id=sparql_escape_uri(annotation_uri),
             activity_id=sparql_escape_uri(self.activity_id),
             user=sparql_escape_uri(self.agent),
-            skolem=sparql_escape_uri("http://example.org/{0}".format(uuid.uuid4())),
+            skolem=skolem_uuid,
             subject=sparql_escape_uri(self.subject),
             pred=self.predicate,  # Already escaped or prefixed name
             obj=self.object,  # Already escaped (string literal or URI)
             confidence=sparql_escape_float(self.confidence),
             part_of_id=part_of_id,
+            skolem_parts=skolem_parts,
             selector_part=selector_part,
+            skolem_filter=skolem_filter,
             selector_filter=selector_filter
         )
         try:
             update(query_string, sudo=True)
         except Exception as e:
-            self.logger = logging.getLogger(self.__class__.__name__)
             error_msg = f"Failed to insert TripletAnnotation to triplestore for subject {self.subject}: {e}"
             self.logger.error(error_msg, exc_info=True)
             raise RuntimeError(error_msg) from e
