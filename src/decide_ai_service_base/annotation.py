@@ -471,9 +471,13 @@ class RelationExtractionAnnotation(NERAnnotation):
                   ?body a rdf:Statement ; rdf:subject ?subj; rdf:predicate ?pred; rdf:object ?obj .
                   OPTIONAL { ?annotation oa:motivatedBy ?motivation . }
 
-                  # Example filter (uncomment and edit as needed):
-                  FILTER(?source = $uri)
-                  FILTER(?motivation = oa:linking)
+                  # Example filter (uncomment and edit as needed):               
+                  VALUES ?source {
+                    $uri
+                  }
+                  VALUES ?motivation {
+                    oa:linking
+                  }
 
                   OPTIONAL {
                       ?activity a prov:Activity ;
