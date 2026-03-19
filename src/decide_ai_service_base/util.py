@@ -97,16 +97,16 @@ def fail_busy_and_scheduled_tasks():
         }}
         WHERE {{
             GRAPH $graph {{
-                ?task a task:Task ;
-                      dct:isPartOf ?job ;
-                      task:operation ?operation ;
-                      adms:status ?status .
                 VALUES ?operation {{
                     {operations_values}
                 }}
                 VALUES ?status {{
                     {sparql_escape_uri(JOB_STATUSES["busy"])}
                 }}
+                ?task a task:Task ;
+                      dct:isPartOf ?job ;
+                      task:operation ?operation ;
+                      adms:status ?status .
             }}
         }}
         """

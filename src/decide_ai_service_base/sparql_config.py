@@ -53,23 +53,20 @@ SPARQL_PREFIXES = {
 # ==============================================================================
 # Named graphs in the RDF store
 
-TARGET_GRAPH = os.getenv("TARGET_GRAPH", None)
-PUBLICATION_GRAPH = os.getenv("PUBLICATION_GRAPH", None)
-
 GRAPHS = {
     # INPUT GRAPHS
-    "jobs": TARGET_GRAPH if TARGET_GRAPH else "http://mu.semte.ch/graphs/jobs",
-    "data_containers": TARGET_GRAPH if TARGET_GRAPH else "http://mu.semte.ch/graphs/data-containers",
-    "harvest_collections": TARGET_GRAPH if TARGET_GRAPH else "http://mu.semte.ch/graphs/harvest-collections",
-    "remote_objects": TARGET_GRAPH if TARGET_GRAPH else "http://mu.semte.ch/graphs/remote-objects",
-    "files": TARGET_GRAPH if TARGET_GRAPH else "http://mu.semte.ch/graphs/files",
-    "oparl_temp": TARGET_GRAPH if TARGET_GRAPH else "http://mu.semte.ch/graphs/oparl-temp",
-    "oslo_temp": TARGET_GRAPH if TARGET_GRAPH else "http://mu.semte.ch/graphs/oslo-temp",
+    "jobs": os.getenv('JOB_GRAPH', "http://mu.semte.ch/graphs/jobs"),
+    "data_containers": os.getenv('DATA_CONTAINER_GRAPH', "http://mu.semte.ch/graphs/data-containers"),
+    "harvest_collections": os.getenv('HARVEST_COLLECTIONS_GRAPH', "http://mu.semte.ch/graphs/harvest-collections"),
+    "remote_objects": os.getenv('REMOTE_OBJECT_GRAPH', "http://mu.semte.ch/graphs/remote-objects"),
+    "files": os.getenv('FILES_GRAPH', "http://mu.semte.ch/graphs/files"),
+    "oparl_temp": os.getenv('OPARL_TEMP_GRAPH', "http://mu.semte.ch/graphs/oparl-temp"),
+    "oslo_temp": os.getenv('OSLO_TEMP_GRAPH', "http://mu.semte.ch/graphs/oslo-temp"),
     # OUTPUT GRAPHS
-    "expressions": PUBLICATION_GRAPH if PUBLICATION_GRAPH else "http://mu.semte.ch/graphs/expressions",
-    "works": PUBLICATION_GRAPH if PUBLICATION_GRAPH else "http://mu.semte.ch/graphs/works",
-    "manifestations": PUBLICATION_GRAPH if PUBLICATION_GRAPH else "http://mu.semte.ch/graphs/manifestations",
-    "ai": PUBLICATION_GRAPH if PUBLICATION_GRAPH else "http://mu.semte.ch/graphs/ai",
+    "expressions": os.getenv('EXPRESSIONS_GRAPH', "http://mu.semte.ch/graphs/expressions"),
+    "works": os.getenv('WORKS_GRAPH', "http://mu.semte.ch/graphs/works"),
+    "manifestations": os.getenv('MANIFESTATIONS_GRAPH', "http://mu.semte.ch/graphs/manifestations"),
+    "ai": os.getenv('AI_GRAPH', "http://mu.semte.ch/graphs/ai"),
 
 }
 

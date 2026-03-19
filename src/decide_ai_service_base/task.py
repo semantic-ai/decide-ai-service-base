@@ -67,12 +67,12 @@ class Task(ABC):
             get_prefixes_for_query("task", "adms") +
             """
             DELETE {
-            GRAPH <""" + GRAPHS["jobs"] + """> {
+            GRAPH $graph {
                 ?task adms:status ?status .
             }
             }
             WHERE {
-            GRAPH <""" + GRAPHS["jobs"] + """> {
+            GRAPH $graph {
                 BIND($task AS ?task)
                 ?task adms:status ?status .
             }
@@ -81,27 +81,26 @@ class Task(ABC):
         )
 
         update(delete_query.substitute(
-            task=sparql_escape_uri(self.task_uri)
+            task=sparql_escape_uri(self.task_uri),
+            graph=sparql_escape_uri(GRAPHS["jobs"])
         ), sudo=True)
 
         # 2. Insert the new status
         insert_query = Template(
             get_prefixes_for_query("task", "adms") +
             """
-            INSERT {
-            GRAPH <""" + GRAPHS["jobs"] + """> {
-                ?task adms:status <$new_status> .
+            INSERT DATA {
+            GRAPH $graph {
+                ?task adms:status $new_status .
             }
-            }
-            WHERE {
-                BIND($task AS ?task)
             }
             """
         )
 
         update(insert_query.substitute(
-            new_status=JOB_STATUSES[new_state],
-            task=sparql_escape_uri(self.task_uri)
+            new_status=sparql_escape_uri(JOB_STATUSES[new_state]),
+            task=sparql_escape_uri(self.task_uri),
+            graph=sparql_escape_uri(GRAPHS["jobs"])
         ), sudo=True)
 
         # Batch-insert results containers (if any)
@@ -110,13 +109,10 @@ class Task(ABC):
             insert_template = Template(
                 get_prefixes_for_query("task", "adms") +
                 """
-                INSERT {
-                GRAPH <""" + GRAPHS["jobs"] + """> {
+                INSERT DATA {
+                GRAPH $graph {
                     ?task $results_container_line .
                 }
-                }
-                WHERE {
-                    BIND($task AS ?task)
                 }
                 """
             )
@@ -128,7 +124,8 @@ class Task(ABC):
                 )
                 query_string = insert_template.substitute(
                     task=sparql_escape_uri(self.task_uri),
-                    results_container_line=results_container_line
+                    results_container_line=results_container_line,
+                    graph=sparql_escape_uri(GRAPHS["jobs"])
                 )
                 update(query_string, sudo=True)
 
@@ -212,9 +209,9 @@ class Task(ABC):
         # 1) Prefer provenance from TranslationTask's eli:realizes annotation
         provenance_q = Template(
             get_prefixes_for_query("oa", "rdf", "eli") +
-            f"""
+            """
             SELECT DISTINCT ?source WHERE {{
-            GRAPH <{GRAPHS["ai"]}> {{
+            GRAPH $graph {{
                 ?ann a oa:Annotation ;
                     oa:motivatedBy oa:linking ;
                     oa:hasBody ?stmt ;
@@ -233,7 +230,10 @@ class Task(ABC):
             }}
             LIMIT 1
             """
-        ).substitute(translated=sparql_escape_uri(translated_expression_uri))
+        ).substitute(
+            translated=sparql_escape_uri(translated_expression_uri),
+            graph=sparql_escape_uri(GRAPHS["ai"])
+        )
 
         provenance_bindings = query(provenance_q, sudo=True).get("results", {}).get("bindings", [])
         if provenance_bindings and "source" in provenance_bindings[0]:

@@ -21,7 +21,7 @@ class Annotation(ABC):
         self.logger = logging.getLogger(__name__)
 
     @abstractmethod
-    def add_to_triplestore(self):
+    def add_to_triplestore_if_not_exists(self):
         """Insert this annotation into the triplestore."""
         pass
 
@@ -52,8 +52,12 @@ class LinkingAnnotation(Annotation):
           OPTIONAL { ?annotation oa:motivatedBy ?motivation . }
 
           # Example filter (uncomment and edit as needed):
-          FILTER(?target = $uri)
-          FILTER(?motivation = oa:classifying)
+          VALUES ?target {
+            $uri
+          }
+          VALUES ?motivation {
+            oa:classifying
+          }
 
           OPTIONAL {
               ?activity a prov:Activity ;
@@ -79,15 +83,16 @@ class LinkingAnnotation(Annotation):
             yield cls(item['activity']['value'], uri, item['body']['value'], item['agent']['value'],
                       item['agentType']['value'])
 
-    def add_to_triplestore(self):
+    def add_to_triplestore_if_not_exists(self):
         query_template = Template(
             get_prefixes_for_query("ex", "oa", "mu", "prov", "foaf", "dct", "skolem", "nif") +
             """
             INSERT {
-              GRAPH <""" + GRAPHS["ai"] + """> {
+              GRAPH $graph {
                   $activity_id a prov:Activity;
                      prov:generated $annotation_id;
-                     prov:wasAssociatedWith $user .
+                     prov:wasAssociatedWith $user;
+                     mu:uuid "$activity_uuid" .
 
                   $annotation_id a oa:Annotation ;
                                  mu:uuid "$id";
@@ -97,7 +102,7 @@ class LinkingAnnotation(Annotation):
                                  oa:hasTarget $uri .
               }
             } WHERE {
-              GRAPH <""" + GRAPHS["ai"] + """> {
+              GRAPH $graph {
                   FILTER NOT EXISTS { 
                     ?existingAnn a oa:Annotation ;
                         oa:hasBody $clz ;
@@ -113,11 +118,13 @@ class LinkingAnnotation(Annotation):
             """)
         query_string = query_template.substitute(
             id=str(uuid.uuid1()),
+            activity_uuid=str(uuid.uuid4()),
             annotation_id=sparql_escape_uri("http://example.org/{0}".format(uuid.uuid4())),
             activity_id=sparql_escape_uri(self.activity_id),
             uri=sparql_escape_uri(self.source_uri),
             user=sparql_escape_uri(self.agent),
-            clz=sparql_escape_uri(self.class_uri)
+            clz=sparql_escape_uri(self.class_uri),
+            graph=sparql_escape_uri(GRAPHS["ai"])
         )
         try:
             update(query_string, sudo=True)
@@ -158,8 +165,12 @@ class NERAnnotation(Annotation):
           OPTIONAL { ?annotation oa:motivatedBy ?motivation . }
 
           # Example filter (uncomment and edit as needed):
-          FILTER(?source = $uri)
-          FILTER(?motivation = oa:tagging)
+          VALUES ?source {
+            $uri
+          }
+          VALUES ?motivation {
+            oa:tagging
+          }
 
           OPTIONAL {
               ?activity a prov:Activity ;
@@ -182,7 +193,7 @@ class NERAnnotation(Annotation):
             yield cls(item['activity']['value'], uri, item['body']['value'], start_val,
                       end_val, item['agent']['value'], item['agentType']['value'])
 
-    def add_to_triplestore(self):
+    def add_to_triplestore_if_not_exists(self):
         # Generate URIs
         annotation_id = sparql_escape_uri("http://example.org/{0}".format(uuid.uuid4()))
         part_of_id = sparql_escape_uri("http://www.example.org/id/.well-known/genid/{0}".format(uuid.uuid4()))
@@ -195,11 +206,12 @@ class NERAnnotation(Annotation):
             get_prefixes_for_query("ex", "oa", "mu", "prov", "foaf", "dct", "skolem", "nif", "locn", "geosparql") +
             """
             INSERT {
-              GRAPH <""" + GRAPHS["ai"] + """> {
+              GRAPH $graph {
                   $activity_id a prov:Activity;
                      prov:generated $annotation_id;
-                     prov:wasAssociatedWith $user .
-
+                     prov:wasAssociatedWith $user;
+                     mu:uuid "$activity_uuid" . 
+                     .
                   $annotation_id a oa:Annotation ;
                                  mu:uuid "$id";
                                  oa:hasBody $clz ;
@@ -212,7 +224,7 @@ class NERAnnotation(Annotation):
                   $extra
               }
             } WHERE {
-              GRAPH <""" + GRAPHS["ai"] + """> {
+              GRAPH $graph {
                   FILTER NOT EXISTS {
                     ?existingAnn a oa:Annotation ;
                         oa:hasBody $clz ;
@@ -231,6 +243,7 @@ class NERAnnotation(Annotation):
         query_string = query_template.substitute(
             id=str(uuid.uuid1()),
             annotation_id=annotation_id,
+            activity_uuid=str(uuid.uuid4()),
             activity_id=sparql_escape_uri(self.activity_id),
             part_of_id=part_of_id,
             user=sparql_escape_uri(self.agent),
@@ -238,7 +251,8 @@ class NERAnnotation(Annotation):
             confidence=sparql_escape_float(self.confidence),
             extra=self.get_extra_inserts(),
             selector_part=selector_part,
-            selector_filter=selector_filter
+            selector_filter=selector_filter,
+            graph=GRAPHS['ai']
         )
 
         try:
@@ -285,12 +299,12 @@ class NERAnnotation(Annotation):
                     FILTER NOT EXISTS {{ ?existingTarget oa:selector ?anySelector . }}"""
         return selector_part, selector_filter
     
-    def _build_skolem_parts(self, skolem_uuid: str, subject: str, predicate: str, object: str, entity_class: Optional[str]) -> tuple[str, str]:
+    def _build_skolem_parts(self, skolem_uri: str, subject: str, predicate: str, object: str, entity_class: Optional[str]) -> tuple[str, str]:
         """
         Helper method to build skolem SPARQL parts.
 
         Args:
-            skolem_uuid: The escaped URI for the skolemized statement
+            skolem_uri: The escaped URI for the skolemized statement
             subject: The escaped subject URI
             predicate: The predicate (already escaped or prefixed)
             object: The escaped object (URI or literal)
@@ -310,7 +324,7 @@ class NERAnnotation(Annotation):
             entity_class_uuid = f"skolem:{uuid.uuid4()}"
 
             skolem_parts = f"""
-                {skolem_uuid} a rdf:Statement ;
+                {skolem_uri} a rdf:Statement ;
                   rdf:subject {subject} ;
                   rdf:predicate {predicate} ;
                   rdf:object {entity_class_uuid} .
@@ -330,7 +344,7 @@ class NERAnnotation(Annotation):
 
         else:
             skolem_parts = f"""
-                {skolem_uuid} a rdf:Statement ;
+                {skolem_uri} a rdf:Statement ;
                   rdf:subject {subject} ;
                   rdf:predicate {predicate} ;
                   rdf:object {object} .
@@ -424,7 +438,7 @@ class GeoAnnotation(NERAnnotation):
         )
 
 
-class TripletAnnotation(NERAnnotation):
+class RelationExtractionAnnotation(NERAnnotation):
     """NER annotation representing an RDF statement (subject-predicate-object triple)."""
 
     def __init__(self, subject: str, predicate: str, obj: str, activity_id: str, source_uri: str,
@@ -438,7 +452,7 @@ class TripletAnnotation(NERAnnotation):
         self.entity_class = entity_class
 
     @classmethod
-    def create_from_uri(cls, uri: str) -> Iterator['TripletAnnotation']:
+    def create_from_uri(cls, uri: str) -> Iterator['RelationExtractionAnnotation']:
         query_template = Template(
             get_prefixes_for_query("oa", "prov", "rdf") +
             """
@@ -483,7 +497,7 @@ class TripletAnnotation(NERAnnotation):
                       uri,
                       start_val, end_val, item['agent']['value'], item.get('agentType', {}).get('value'))
 
-    def add_to_triplestore(self) -> str:
+    def add_to_triplestore_if_not_exists(self) -> str:
         """
         Insert this annotation into the triplestore.
         
@@ -495,9 +509,14 @@ class TripletAnnotation(NERAnnotation):
         uri = sparql_escape_uri(self.source_uri)
 
         # Build skolem parts with actual values substituted
-        skolem_uuid = f"skolem:{uuid.uuid4()}"
-        skolem_parts, skolem_filter = self._build_skolem_parts(skolem_uuid, sparql_escape_uri(
-            self.subject), self.predicate, self.object, self.entity_class)
+        skolem_uri = f"skolem:{uuid.uuid4()}"
+        skolem_parts, skolem_filter = self._build_skolem_parts(
+            skolem_uri,
+            sparql_escape_uri(self.subject),
+            self.predicate,
+            self.object,
+            self.entity_class
+        )
 
         # Build selector parts with actual values substituted
         selector_part, selector_filter = self._build_selector_parts(
@@ -507,10 +526,11 @@ class TripletAnnotation(NERAnnotation):
             get_prefixes_for_query("ex", "oa", "mu", "prov", "foaf", "dct", "skolem", "nif", "rdf", "eli", "org", "rdfs") +
             """
             INSERT {
-              GRAPH <""" + GRAPHS["ai"] + """> {
+              GRAPH $graph {
                   $activity_id a prov:Activity;
                      prov:generated $annotation_id;
-                     prov:wasAssociatedWith $user .
+                     prov:wasAssociatedWith $user ;
+                     mu:uuid "$activity_uuid" .
 
                   $annotation_id a oa:Annotation ;
                      mu:uuid "$id";
@@ -522,7 +542,7 @@ class TripletAnnotation(NERAnnotation):
                   $selector_part
               }
             } WHERE {
-              GRAPH <""" + GRAPHS["ai"] + """> {
+              GRAPH $graph {
                   FILTER NOT EXISTS { 
                     ?existingAnn a oa:Annotation ;
                         oa:hasBody ?existingSkolem ;
@@ -542,9 +562,10 @@ class TripletAnnotation(NERAnnotation):
         query_string = query_template.substitute(
             id=str(uuid.uuid1()),
             annotation_id=sparql_escape_uri(annotation_uri),
+            activity_uuid=str(uuid.uuid4()),
             activity_id=sparql_escape_uri(self.activity_id),
             user=sparql_escape_uri(self.agent),
-            skolem=skolem_uuid,
+            skolem=skolem_uri,
             subject=sparql_escape_uri(self.subject),
             pred=self.predicate,  # Already escaped or prefixed name
             obj=self.object,  # Already escaped (string literal or URI)
@@ -553,7 +574,8 @@ class TripletAnnotation(NERAnnotation):
             skolem_parts=skolem_parts,
             selector_part=selector_part,
             skolem_filter=skolem_filter,
-            selector_filter=selector_filter
+            selector_filter=selector_filter,
+            graph=sparql_escape_uri(GRAPHS["ai"])
         )
         try:
             update(query_string, sudo=True)
