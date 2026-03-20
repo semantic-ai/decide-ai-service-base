@@ -239,27 +239,6 @@ class Task(ABC):
         if provenance_bindings and "source" in provenance_bindings[0]:
             source_uri = provenance_bindings[0]["source"]["value"]
 
-        # 2) Fallback: any other expression that realizes the same work
-        if not source_uri:
-            fallback_q = Template(
-                get_prefixes_for_query("eli") +
-                """
-                SELECT DISTINCT ?source WHERE {
-                GRAPH ?g {
-                    $translated eli:realizes ?work .
-                    ?source a eli:Expression ;
-                            eli:realizes ?work .
-                    FILTER(?source != $translated)
-                }
-                }
-                LIMIT 1
-                """
-            ).substitute(translated=sparql_escape_uri(translated_expression_uri))
-
-            fallback_bindings = query(fallback_q, sudo=True).get("results", {}).get("bindings", [])
-            if fallback_bindings and "source" in fallback_bindings[0]:
-                source_uri = fallback_bindings[0]["source"]["value"]
-
         if not source_uri:
             source_uri = translated_expression_uri
 
