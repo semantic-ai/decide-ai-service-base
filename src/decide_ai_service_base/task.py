@@ -75,8 +75,8 @@ class Task(ABC):
             }
             WHERE {
             GRAPH $graph {
-                VALUES $task {
-                  ?task
+                VALUES ?task {
+                  $task
                 }
                 ?task adms:status ?status .
             }
