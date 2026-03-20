@@ -47,8 +47,10 @@ class Task(ABC):
             get_prefixes_for_query("adms", "task") +
             """
             SELECT ?task ?taskType WHERE {
+              VALUES ?task {
+                $uri
+              }
               ?task task:operation ?taskType .
-              FILTER(?task = $uri)
             }
         """).substitute(uri=sparql_escape_uri(task_uri))
         for b in query(q, sudo=True).get('results').get('bindings'):
