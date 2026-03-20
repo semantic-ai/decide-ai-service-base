@@ -50,11 +50,11 @@ def get_one_open_task() -> str | None:
     q = f"""
         {get_prefixes_for_query("task", "adms")}
         SELECT ?task WHERE {{
-        GRAPH <{GRAPHS["jobs"]}> {{
+        GRAPH {sparql_escape_uri(GRAPHS["jobs"])} {{
             VALUES ?targetOperations {{
                 {operations}
             }}
-            ?task adms:status <{JOB_STATUSES["scheduled"]}> ;
+            ?task adms:status {sparql_escape_uri(JOB_STATUSES["scheduled"])} ;
                   task:operation ?targetOperations .
         }}
         }}
