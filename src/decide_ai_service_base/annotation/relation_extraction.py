@@ -99,7 +99,7 @@ class RelationExtractionAnnotation(NERAnnotation):
 
         query_template = Template(
             get_prefixes_for_query("ex", "oa", "mu", "prov", "foaf", "dct", "skolem", "nif", "rdf", "eli", "org",
-                                   "rdfs") +
+                                   "rdfs", "eli-dl") +
             """
             INSERT {
               GRAPH $graph {
@@ -156,7 +156,7 @@ class RelationExtractionAnnotation(NERAnnotation):
         try:
             update(query_string, sudo=True)
         except Exception as e:
-            error_msg = f"Failed to insert TripletAnnotation to triplestore for subject {self.subject}: {e}"
+            error_msg = f"Failed to insert RelationExtractionAnnotation to triplestore for subject {self.subject}: {e}"
             self.logger.error(error_msg, exc_info=True)
             raise RuntimeError(error_msg) from e
         return annotation_uri
