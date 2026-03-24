@@ -1,6 +1,6 @@
 [project]
 name = "decide-ai-service-base"
-version = "0.1.0"
+version = "0.1.1"
 description = "Base package for implementing AI services in the template for the DECIDe project"
 requires-python = ">=3.12"
 dependencies = [
