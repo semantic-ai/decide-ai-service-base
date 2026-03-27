@@ -95,7 +95,7 @@ class Task(ABC):
             """
             INSERT DATA {
             GRAPH $graph {
-                ?task adms:status $new_status .
+                $task adms:status $new_status .
             }
             }
             """
@@ -115,7 +115,7 @@ class Task(ABC):
                 """
                 INSERT DATA {
                 GRAPH $graph {
-                    ?task $results_container_line .
+                    $task $results_container_line .
                 }
                 }
                 """
