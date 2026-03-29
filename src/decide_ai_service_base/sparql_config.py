@@ -104,6 +104,8 @@ TASK_OPERATIONS = {
     "geo_extraction": "http://lblod.data.gift/id/jobs/concept/TaskOperation/geo-extracting",
     "translation": "http://lblod.data.gift/id/jobs/concept/TaskOperation/translating",
     "segmentation": "http://lblod.data.gift/id/jobs/concept/TaskOperation/segmenting",
+    "pdf_scraping": "http://lblod.data.gift/id/jobs/concept/TaskOperation/pdf-scraping",
+    "pdf_content_extraction": "http://lblod.data.gift/id/jobs/concept/TaskOperation/pdf-to-eli",
 }
 
 # ==============================================================================
