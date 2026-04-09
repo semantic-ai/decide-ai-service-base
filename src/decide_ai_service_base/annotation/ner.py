@@ -37,9 +37,9 @@ class NERAnnotation(Annotation):
           ?annotation a oa:Annotation ;
                        oa:hasTarget ?target .
           ?target a oa:SpecificResource ;
-                  oa:source ?source .
+                  oa:hasSource ?source .
           OPTIONAL {
-              ?target oa:selector ?selector .
+              ?target oa:hasSelector ?selector .
               ?selector a oa:TextPositionSelector ;
                       oa:start ?start; oa:end ?end .
           }
@@ -81,11 +81,10 @@ class NERAnnotation(Annotation):
             """
             INSERT {
               GRAPH $graph {
-                  $activity_id a prov:Activity;
-                     prov:generated $annotation_id;
-                     prov:wasAssociatedWith $user;
-                     mu:uuid "$activity_uuid" . 
-                     .
+                  $activity_id a prov:Activity ;
+                     prov:generated $annotation_id ;
+                     prov:wasAssociatedWith $user .
+                     
                   $annotation_id a oa:Annotation ;
                                  mu:uuid "$id";
                                  oa:hasBody $clz ;
@@ -117,7 +116,6 @@ class NERAnnotation(Annotation):
         query_string = query_template.substitute(
             id=str(uuid.uuid1()),
             annotation_id=annotation_id,
-            activity_uuid=str(uuid.uuid4()),
             activity_id=sparql_escape_uri(self.activity_id),
             part_of_id=part_of_id,
             user=sparql_escape_uri(self.agent),
@@ -149,16 +147,18 @@ class NERAnnotation(Annotation):
             selector_id = sparql_escape_uri("http://www.example.org/id/.well-known/genid/{0}".format(uuid.uuid4()))
             selector_part = f"""
                   {part_of_id} a oa:SpecificResource ;
-                              oa:source {uri} ;
-                              oa:selector {selector_id} .
+                              mu:uuid "{str(uuid.uuid4())}" ;
+                              oa:hasSource {uri} ;
+                              oa:hasSelector {selector_id} .
 
                   {selector_id} a oa:TextPositionSelector ;
+                               mu:uuid "{str(uuid.uuid4())}" ;
                                oa:start {self.start} ;
                                oa:end {self.end} ."""
             selector_filter = f"""
                     ?existingTarget a oa:SpecificResource ;
-                        oa:source {uri} ;
-                        oa:selector ?existingSelector .
+                        oa:hasSource {uri} ;
+                        oa:hasSelector ?existingSelector .
 
                     ?existingSelector a oa:TextPositionSelector ;
                           oa:start {self.start} ;
@@ -166,11 +166,12 @@ class NERAnnotation(Annotation):
         else:
             selector_part = f"""
                   {part_of_id} a oa:SpecificResource ;
-                              oa:source {uri} ."""
+                              mu:uuid "{str(uuid.uuid4())}" ;
+                              oa:hasSource {uri} ."""
             selector_filter = f"""
                     ?existingTarget a oa:SpecificResource ;
-                        oa:source {uri} .
-                    FILTER NOT EXISTS {{ ?existingTarget oa:selector ?anySelector . }}"""
+                        oa:hasSource {uri} .
+                    FILTER NOT EXISTS {{ ?existingTarget oa:hasSelector ?anySelector . }}"""
         return selector_part, selector_filter
 
     def _build_skolem_parts(self, skolem_uri: str, subject: str, predicate: str, object: str,

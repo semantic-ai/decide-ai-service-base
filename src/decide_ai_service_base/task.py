@@ -227,7 +227,7 @@ class Task(ABC):
                     rdf:object ?work .
 
                 ?target a oa:SpecificResource ;
-                        oa:source ?source .
+                        oa:hasSource ?source .
 
                 FILTER(?source != $translated)
             }}

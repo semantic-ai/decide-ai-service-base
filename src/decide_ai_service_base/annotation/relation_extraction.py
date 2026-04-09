@@ -40,9 +40,9 @@ class RelationExtractionAnnotation(NERAnnotation):
                   ?annotation a oa:Annotation ;
                                oa:hasTarget ?target .
                   ?target a oa:SpecificResource ;
-                          oa:source ?source .
+                          oa:hasSource ?source .
                   OPTIONAL {
-                      ?target oa:selector ?selector .
+                      ?target oa:hasSelector ?selector .
                       ?selector a oa:TextPositionSelector ;
                               oa:start ?start; oa:end ?end .
                   }
@@ -105,8 +105,7 @@ class RelationExtractionAnnotation(NERAnnotation):
               GRAPH $graph {
                   $activity_id a prov:Activity;
                      prov:generated $annotation_id;
-                     prov:wasAssociatedWith $user ;
-                     mu:uuid "$activity_uuid" .
+                     prov:wasAssociatedWith $user .
 
                   $annotation_id a oa:Annotation ;
                      mu:uuid "$id";
@@ -138,7 +137,6 @@ class RelationExtractionAnnotation(NERAnnotation):
         query_string = query_template.substitute(
             id=str(uuid.uuid1()),
             annotation_id=sparql_escape_uri(annotation_uri),
-            activity_uuid=str(uuid.uuid4()),
             activity_id=sparql_escape_uri(self.activity_id),
             user=sparql_escape_uri(self.agent),
             skolem=skolem_uri,

@@ -68,8 +68,7 @@ class LinkingAnnotation(Annotation):
               GRAPH $graph {
                   $activity_id a prov:Activity;
                      prov:generated $annotation_id;
-                     prov:wasAssociatedWith $user;
-                     mu:uuid "$activity_uuid" .
+                     prov:wasAssociatedWith $user .
 
                   $annotation_id a oa:Annotation ;
                                  mu:uuid "$id";
@@ -95,7 +94,6 @@ class LinkingAnnotation(Annotation):
             """)
         query_string = query_template.substitute(
             id=str(uuid.uuid1()),
-            activity_uuid=str(uuid.uuid4()),
             annotation_id=sparql_escape_uri("http://example.org/{0}".format(uuid.uuid4())),
             activity_id=sparql_escape_uri(self.activity_id),
             uri=sparql_escape_uri(self.source_uri),
