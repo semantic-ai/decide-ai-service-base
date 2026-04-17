@@ -140,11 +140,12 @@ class RelationExtractionAnnotation(NERAnnotation):
             annotation_id=sparql_escape_uri(annotation_uri),
             activity_id=sparql_escape_uri(self.activity_id),
             user=sparql_escape_uri(self.agent),
-            specific_resource_uri=specific_resource_uri,
+            statement_uri=statement_uri,
             subject=sparql_escape_uri(self.subject),
             pred=self.predicate,  # Already escaped or prefixed name
             obj=self.object,  # Already escaped (string literal or URI)
             confidence=sparql_escape_float(self.confidence),
+            specific_resource_uri=specific_resource_uri,
             statement_parts=statement_parts,
             selector_part=selector_part,
             statement_filter=statement_filter,
