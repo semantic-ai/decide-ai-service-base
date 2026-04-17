@@ -79,13 +79,13 @@ class RelationExtractionAnnotation(NERAnnotation):
             The URI of the created annotation
         """
         annotation_uri = "{0}{1}".format(SPARQL_PREFIXES["annotations"], uuid.uuid4())
-        part_of_id = sparql_escape_uri("{0}{1}".format(SPARQL_PREFIXES["skolem"], uuid.uuid4()))
+        specific_resource_uri = sparql_escape_uri("{0}{1}".format(SPARQL_PREFIXES["specific_resource"], uuid.uuid4()))
         uri = sparql_escape_uri(self.source_uri)
 
-        # Build skolem parts with actual values substituted
-        skolem_uri = sparql_escape_uri("{0}{1}".format(SPARQL_PREFIXES["skolem"], uuid.uuid4()))
-        skolem_parts, skolem_filter = self._build_skolem_parts(
-            skolem_uri,
+        # Build statement parts with actual values substituted
+        statement_uri = sparql_escape_uri("{0}{1}".format(SPARQL_PREFIXES["statement"], uuid.uuid4()))
+        statement_parts, statement_filter = self._build_statement_parts(
+            statement_uri,
             sparql_escape_uri(self.subject),
             self.predicate,
             self.object,
@@ -93,11 +93,11 @@ class RelationExtractionAnnotation(NERAnnotation):
 
         # Build selector parts with actual values substituted
         selector_part, selector_filter = self._build_selector_parts(
-            part_of_id, uri)
+            specific_resource_uri, uri)
 
         query_template = Template(
             get_prefixes_for_query("ext", "oa", "mu", "prov", "foaf", "dct", 
-                                   "skolem", "nif", "rdf", "eli", "org",
+                                   "nif", "rdf", "eli", "org",
                                    "rdfs", "eli-dl", "annotations", "expressions",
                                    "locations", "people", "organizations",
                                    "legal_expressions") +
@@ -110,18 +110,18 @@ class RelationExtractionAnnotation(NERAnnotation):
 
                   $annotation_id a oa:Annotation ;
                      mu:uuid "$id";
-                     oa:hasBody $skolem ;
+                     oa:hasBody $statement_uri ;
                      nif:confidence $confidence ;
                      oa:motivatedBy oa:linking ;
-                     oa:hasTarget $part_of_id .
-                  $skolem_parts
+                     oa:hasTarget $specific_resource_uri .
+                  $statement_parts
                   $selector_part
               }
             } WHERE {
               GRAPH $graph {
                   FILTER NOT EXISTS { 
                     ?existingAnn a oa:Annotation ;
-                        oa:hasBody ?existingSkolem ;
+                        oa:hasBody ?existingStatement ;
                         oa:motivatedBy oa:linking ;
                         oa:hasTarget ?existingTarget .
 
@@ -129,7 +129,7 @@ class RelationExtractionAnnotation(NERAnnotation):
                          prov:generated ?existingAnn ;
                          prov:wasAssociatedWith $user .
 
-                    $skolem_filter
+                    $statement_filter
                     $selector_filter
                   }
               }
@@ -140,15 +140,14 @@ class RelationExtractionAnnotation(NERAnnotation):
             annotation_id=sparql_escape_uri(annotation_uri),
             activity_id=sparql_escape_uri(self.activity_id),
             user=sparql_escape_uri(self.agent),
-            skolem=skolem_uri,
+            specific_resource_uri=specific_resource_uri,
             subject=sparql_escape_uri(self.subject),
             pred=self.predicate,  # Already escaped or prefixed name
             obj=self.object,  # Already escaped (string literal or URI)
             confidence=sparql_escape_float(self.confidence),
-            part_of_id=part_of_id,
-            skolem_parts=skolem_parts,
+            statement_parts=statement_parts,
             selector_part=selector_part,
-            skolem_filter=skolem_filter,
+            statement_filter=statement_filter,
             selector_filter=selector_filter,
             graph=sparql_escape_uri(GRAPHS["ai"])
         )

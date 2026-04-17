@@ -25,7 +25,6 @@ SPARQL_PREFIXES = {
     "oa": "http://www.w3.org/ns/oa#",
     "dct": "http://purl.org/dc/terms/",
     "dcterms": "http://purl.org/dc/terms/",
-    "skolem": "http://www.example.org/id/.well-known/genid/",
     "nif": "http://persistence.uni-leipzig.org/nlp2rdf/ontologies/nif-core#",
     "locn": "http://www.w3.org/ns/locn#",
     "geosparql": "http://www.opengis.net/ont/geosparql#",
@@ -55,7 +54,10 @@ SPARQL_PREFIXES = {
     "organizations": "http://data.lblod.info/id/organizations/",
     "legal_expressions": "http://data.lblod.info/id/legal-expressions/",
     "works": "http://data.lblod.info/id/works/",
-    "linguistics_translations": "http://purl.org/linguistics/gold/translation"
+    "linguistics_translations": "http://purl.org/linguistics/gold/translation",
+    "text_position_selector": "http://data.lblod.info/id/text-position-selector/",
+    "statement": "http://data.lblod.info/id/statement/",
+    "specific_resource": "http://data.lblod.info/id/specific-resource/"
 }
 
 # ==============================================================================

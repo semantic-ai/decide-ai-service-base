@@ -63,7 +63,7 @@ class LinkingAnnotation(Annotation):
     def add_to_triplestore_if_not_exists(self):
         query_template = Template(
             get_prefixes_for_query("ext", "oa", "mu", "prov", "foaf", 
-                                   "dct", "skolem", "nif") +
+                                   "dct", "nif") +
             """
             INSERT {
               GRAPH $graph {
