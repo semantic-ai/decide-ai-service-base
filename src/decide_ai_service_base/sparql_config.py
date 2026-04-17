@@ -46,7 +46,16 @@ SPARQL_PREFIXES = {
     "nie": "http://www.semanticdesktop.org/ontologies/2007/01/19/nie#",
     "harvesting": "http://lblod.data.gift/vocabularies/harvesting/",
     "org": "http://www.w3.org/ns/org#",
-    "besluit": "http://data.vlaanderen.be/ns/besluit#"
+    "besluit": "http://data.vlaanderen.be/ns/besluit#",
+    "ext": "http://mu.semte.ch/vocabularies/ext/",
+    "annotations": "http://data.lblod.info/id/annotations/",
+    "expressions": "http://data.lblod.info/id/expressions/",
+    "locations": "http://data.lblod.info/id/locations/",
+    "people": "http://data.lblod.info/id/people/",
+    "organizations": "http://data.lblod.info/id/organizations/",
+    "legal_expressions": "http://data.lblod.info/id/legal-expressions/",
+    "works": "http://data.lblod.info/id/works/",
+    "linguistics_translations": "http://purl.org/linguistics/gold/translation"
 }
 
 # ==============================================================================
@@ -106,6 +115,9 @@ TASK_OPERATIONS = {
     "segmentation": "http://lblod.data.gift/id/jobs/concept/TaskOperation/segmenting",
     "pdf_scraping": "http://lblod.data.gift/id/jobs/concept/TaskOperation/pdf-scraping",
     "pdf_content_extraction": "http://lblod.data.gift/id/jobs/concept/TaskOperation/pdf-to-eli",
+    "codelist_annotation": "http://lblod.data.gift/id/jobs/concept/TaskOperation/codelist-matching/annotate",
+    "codelist_training": "http://lblod.data.gift/id/jobs/concept/TaskOperation/codelist-matching/train",
+    "codelist_assess_impact": "http://lblod.data.gift/id/jobs/concept/TaskOperation/codelist-matching/assess-impact",
 }
 
 # ==============================================================================
@@ -122,11 +134,12 @@ AGENT_TYPES = {
 # ==============================================================================
 
 AI_COMPONENTS = {
-    "ner_extractor": "http://example.org/entity-extraction",
-    "model_annotater": "http://example.org/model_annotation",
-    "decide_system": "http://example.org/DECIDe",
-    "translator": "http://example.org/translation",
-    "segmenter": "http://example.org/segmentation",
+    "ner_extractor": "http://data.lblod.info/id/ai-components/entity-extraction",
+    "model_annotater": "http://data.lblod.info/id/ai-components/model-annotation",
+    "decide_system": "http://data.lblod.info/id/ai-components/DECIDe",
+    "translator": "http://data.lblod.info/id/ai-components/translation",
+    "segmenter": "http://data.lblod.info/id/ai-components/segmentation",
+    "linker": "http://data.lblod.info/id/ai-components/linking",
 }
 
 # ==============================================================================

@@ -6,7 +6,7 @@ from escape_helpers import sparql_escape_uri, sparql_escape_float
 from helpers import query, update
 
 from .ner import NERAnnotation
-from ..sparql_config import get_prefixes_for_query, GRAPHS
+from ..sparql_config import get_prefixes_for_query, GRAPHS, SPARQL_PREFIXES
 
 
 class RelationExtractionAnnotation(NERAnnotation):
@@ -14,13 +14,12 @@ class RelationExtractionAnnotation(NERAnnotation):
 
     def __init__(self, subject: str, predicate: str, obj: str, activity_id: str, source_uri: str,
                  start: Optional[int], end: Optional[int], agent: str, agent_type: str,
-                 confidence: float = 1.0, entity_class: Optional[str] = None):
+                 confidence: float = 1.0):
         super().__init__(activity_id, source_uri, predicate, start, end, agent, agent_type)
         self.predicate = predicate
         self.object = obj
         self.subject = subject
         self.confidence = confidence
-        self.entity_class = entity_class
 
     @classmethod
     def create_from_uri(cls, uri: str) -> Iterator['RelationExtractionAnnotation']:
@@ -79,18 +78,17 @@ class RelationExtractionAnnotation(NERAnnotation):
         Returns:
             The URI of the created annotation
         """
-        annotation_uri = "http://example.org/{0}".format(uuid.uuid4())
-        part_of_id = sparql_escape_uri("http://www.example.org/id/.well-known/genid/{0}".format(uuid.uuid4()))
+        annotation_uri = "{0}{1}".format(SPARQL_PREFIXES["annotations"], uuid.uuid4())
+        part_of_id = sparql_escape_uri("{0}{1}".format(SPARQL_PREFIXES["skolem"], uuid.uuid4()))
         uri = sparql_escape_uri(self.source_uri)
 
         # Build skolem parts with actual values substituted
-        skolem_uri = f"skolem:{uuid.uuid4()}"
+        skolem_uri = sparql_escape_uri("{0}{1}".format(SPARQL_PREFIXES["skolem"], uuid.uuid4()))
         skolem_parts, skolem_filter = self._build_skolem_parts(
             skolem_uri,
             sparql_escape_uri(self.subject),
             self.predicate,
             self.object,
-            self.entity_class
         )
 
         # Build selector parts with actual values substituted
@@ -98,8 +96,11 @@ class RelationExtractionAnnotation(NERAnnotation):
             part_of_id, uri)
 
         query_template = Template(
-            get_prefixes_for_query("ex", "oa", "mu", "prov", "foaf", "dct", "skolem", "nif", "rdf", "eli", "org",
-                                   "rdfs", "eli-dl") +
+            get_prefixes_for_query("ext", "oa", "mu", "prov", "foaf", "dct", 
+                                   "skolem", "nif", "rdf", "eli", "org",
+                                   "rdfs", "eli-dl", "annotations", "expressions",
+                                   "locations", "people", "organizations",
+                                   "legal_expressions") +
             """
             INSERT {
               GRAPH $graph {

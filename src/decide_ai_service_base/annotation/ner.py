@@ -6,7 +6,7 @@ from escape_helpers import sparql_escape_uri, sparql_escape_float
 from helpers import query, update
 
 from .base import Annotation
-from ..sparql_config import get_prefixes_for_query, GRAPHS
+from ..sparql_config import get_prefixes_for_query, GRAPHS, SPARQL_PREFIXES
 
 
 class NERAnnotation(Annotation):
@@ -69,15 +69,16 @@ class NERAnnotation(Annotation):
 
     def add_to_triplestore_if_not_exists(self):
         # Generate URIs
-        annotation_id = sparql_escape_uri("http://example.org/{0}".format(uuid.uuid4()))
-        part_of_id = sparql_escape_uri("http://www.example.org/id/.well-known/genid/{0}".format(uuid.uuid4()))
+        annotation_id = sparql_escape_uri("{0}{1}".format(SPARQL_PREFIXES["annotations"], uuid.uuid4()))
+        part_of_id = sparql_escape_uri("{0}{1}".format(SPARQL_PREFIXES["skolem"], uuid.uuid4()))
         uri = sparql_escape_uri(self.source_uri)
 
         # Build selector parts with actual values substituted
         selector_part, selector_filter = self._build_selector_parts(part_of_id, uri)
 
         query_template = Template(
-            get_prefixes_for_query("ex", "oa", "mu", "prov", "foaf", "dct", "skolem", "nif", "locn", "geosparql") +
+            get_prefixes_for_query("ext", "oa", "mu", "prov", "foaf", "dct", 
+                                   "skolem", "nif", "locn", "geosparql") +
             """
             INSERT {
               GRAPH $graph {
@@ -144,7 +145,7 @@ class NERAnnotation(Annotation):
         Returns tuple: (selector_part, selector_filter)
         """
         if self.start is not None and self.end is not None:
-            selector_id = sparql_escape_uri("http://www.example.org/id/.well-known/genid/{0}".format(uuid.uuid4()))
+            selector_id = sparql_escape_uri("{0}{1}".format(SPARQL_PREFIXES["skolem"], uuid.uuid4()))
             selector_part = f"""
                   {part_of_id} a oa:SpecificResource ;
                               mu:uuid "{str(uuid.uuid4())}" ;
@@ -157,10 +158,12 @@ class NERAnnotation(Annotation):
                                oa:end {self.end} ."""
             selector_filter = f"""
                     ?existingTarget a oa:SpecificResource ;
+                        mu:uuid "{str(uuid.uuid4())}" ;
                         oa:hasSource {uri} ;
                         oa:hasSelector ?existingSelector .
 
                     ?existingSelector a oa:TextPositionSelector ;
+                          mu:uuid "{str(uuid.uuid4())}" ;
                           oa:start {self.start} ;
                           oa:end {self.end} ."""
         else:
@@ -174,8 +177,7 @@ class NERAnnotation(Annotation):
                     FILTER NOT EXISTS {{ ?existingTarget oa:hasSelector ?anySelector . }}"""
         return selector_part, selector_filter
 
-    def _build_skolem_parts(self, skolem_uri: str, subject: str, predicate: str, object: str,
-                            entity_class: Optional[str]) -> tuple[str, str]:
+    def _build_skolem_parts(self, skolem_uri: str, subject: str, predicate: str, object: str) -> tuple[str, str]:
         """
         Helper method to build skolem SPARQL parts.
 
@@ -184,54 +186,23 @@ class NERAnnotation(Annotation):
             subject: The escaped subject URI
             predicate: The predicate (already escaped or prefixed)
             object: The escaped object (URI or literal)
-            entity_class: Optional entity class to determine additional triples
 
         Returns:
             A tuple of (skolem_parts, skolem_filter) strings to be included in the SPARQL query
         """
-        sparql_class = None
-        if entity_class and "date" not in entity_class.lower():
-            if entity_class == "MANDATARY":
-                sparql_class = "foaf:Person"
-            elif entity_class == "ADMINISTRATIVE_BODY":
-                sparql_class = "org:Organization"
-
-        if sparql_class:
-            entity_class_uuid = f"skolem:{uuid.uuid4()}"
-
-            skolem_parts = f"""
-                {skolem_uri} a rdf:Statement ;
-                  rdf:subject {subject} ;
-                  rdf:predicate {predicate} ;
-                  rdf:object {entity_class_uuid} .
-
-                {entity_class_uuid} a {sparql_class} ;
-                  rdfs:label {object} .
-                """
-            skolem_filter = f"""
-                ?existingSkolem a rdf:Statement ;
-                  rdf:subject {subject} ;
-                  rdf:predicate {predicate} ;
-                  rdf:object ?existingObject .
-
-                ?existingObject a {sparql_class} ;
-                  rdfs:label {object} .
-                """
-
-        else:
-            skolem_parts = f"""
-                {skolem_uri} a rdf:Statement ;
-                  rdf:subject {subject} ;
-                  rdf:predicate {predicate} ;
-                  rdf:object {object} .
-                """
-            skolem_filter = f"""
-                ?existingSkolem a rdf:Statement ;
-                  rdf:subject {subject} ;
-                  rdf:predicate {predicate} ;
-                  rdf:object {object} .
-                """
-
+        skolem_parts = f"""
+            {skolem_uri} a rdf:Statement ;
+              mu:uuid "{str(uuid.uuid4())}" ;
+              rdf:subject {subject} ;
+              rdf:predicate {predicate} ;
+              rdf:object {object} .
+            """
+        skolem_filter = f"""
+            ?existingSkolem a rdf:Statement ;
+              rdf:subject {subject} ;
+              rdf:predicate {predicate} ;
+              rdf:object {object} .
+            """
         return skolem_parts, skolem_filter
 
     def get_extra_inserts(self) -> str:
