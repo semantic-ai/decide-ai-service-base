@@ -79,13 +79,13 @@ class RelationExtractionAnnotation(NERAnnotation):
             The URI of the created annotation
         """
         annotation_uri = "{0}{1}".format(SPARQL_PREFIXES["annotations"], uuid.uuid4())
-        specific_resource_uri = sparql_escape_uri("{0}{1}".format(SPARQL_PREFIXES["specific_resource"], uuid.uuid4()))
+        specific_resources_uri = sparql_escape_uri("{0}{1}".format(SPARQL_PREFIXES["specific_resources"], uuid.uuid4()))
         uri = sparql_escape_uri(self.source_uri)
 
         # Build statement parts with actual values substituted
-        statement_uri = sparql_escape_uri("{0}{1}".format(SPARQL_PREFIXES["statement"], uuid.uuid4()))
+        statements_uri = sparql_escape_uri("{0}{1}".format(SPARQL_PREFIXES["statements"], uuid.uuid4()))
         statement_parts, statement_filter = self._build_statement_parts(
-            statement_uri,
+            statements_uri,
             sparql_escape_uri(self.subject),
             self.predicate,
             self.object,
@@ -93,7 +93,7 @@ class RelationExtractionAnnotation(NERAnnotation):
 
         # Build selector parts with actual values substituted
         selector_part, selector_filter = self._build_selector_parts(
-            specific_resource_uri, uri)
+            specific_resources_uri, uri)
 
         query_template = Template(
             get_prefixes_for_query("ext", "oa", "mu", "prov", "foaf", "dct", 
@@ -110,10 +110,10 @@ class RelationExtractionAnnotation(NERAnnotation):
 
                   $annotation_id a oa:Annotation ;
                      mu:uuid "$id";
-                     oa:hasBody $statement_uri ;
+                     oa:hasBody $statements_uri ;
                      nif:confidence $confidence ;
                      oa:motivatedBy oa:linking ;
-                     oa:hasTarget $specific_resource_uri .
+                     oa:hasTarget $specific_resources_uri .
                   $statement_parts
                   $selector_part
               }
@@ -140,12 +140,12 @@ class RelationExtractionAnnotation(NERAnnotation):
             annotation_id=sparql_escape_uri(annotation_uri),
             activity_id=sparql_escape_uri(self.activity_id),
             user=sparql_escape_uri(self.agent),
-            statement_uri=statement_uri,
+            statements_uri=statements_uri,
             subject=sparql_escape_uri(self.subject),
             pred=self.predicate,  # Already escaped or prefixed name
             obj=self.object,  # Already escaped (string literal or URI)
             confidence=sparql_escape_float(self.confidence),
-            specific_resource_uri=specific_resource_uri,
+            specific_resources_uri=specific_resources_uri,
             statement_parts=statement_parts,
             selector_part=selector_part,
             statement_filter=statement_filter,

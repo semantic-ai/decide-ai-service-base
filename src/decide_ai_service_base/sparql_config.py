@@ -37,9 +37,8 @@ SPARQL_PREFIXES = {
     "nfo": "http://www.semanticdesktop.org/ontologies/2007/03/22/nfo#",
     "eli": "http://data.europa.eu/eli/ontology#",
     "eli-dl": "http://data.europa.eu/eli/eli-draft-legislation-ontology#",
-    "ns1": "http://www.w3.org/ns/dqv#",
-    "ns2": "https://w3id.org/okn/o/sd#",
-    "ns3": "https://w3id.org/airo#",
+    "dqv": "http://www.w3.org/ns/dqv#",
+    "sd": "https://w3id.org/okn/o/sd#",
     "schema": "https://schema.org/",
     "epvoc": "https://data.europarl.europa.eu/def/epvoc#",
     "nie": "http://www.semanticdesktop.org/ontologies/2007/01/19/nie#",
@@ -55,9 +54,9 @@ SPARQL_PREFIXES = {
     "legal_expressions": "http://data.lblod.info/id/legal-expressions/",
     "works": "http://data.lblod.info/id/works/",
     "linguistics_translations": "http://purl.org/linguistics/gold/translation",
-    "text_position_selector": "http://data.lblod.info/id/text-position-selector/",
-    "statement": "http://data.lblod.info/id/statement/",
-    "specific_resource": "http://data.lblod.info/id/specific-resource/"
+    "text_position_selectors": "http://data.lblod.info/id/text-position-selectors/",
+    "statements": "http://data.lblod.info/id/statements/",
+    "specific_resources": "http://data.lblod.info/id/specific-resources/"
 }
 
 # ==============================================================================
