@@ -27,7 +27,7 @@ query = Template(prefixes + "SELECT ?x WHERE { ?x a oa:Annotation . }")
 graph = GRAPHS["ai"]                           # http://mu.semte.ch/graphs/ai
 status = JOB_STATUSES["busy"]                  # http://redpencil.data.gift/id/concept/JobStatus/busy
 agent = AGENT_TYPES["person"]                  # http://www.w3.org/ns/prov#Person
-component = AI_COMPONENTS["ner_extractor"]     # http://example.org/entity-extraction
+component = AI_COMPONENTS["ner_extractor"]     # http://data.lblod.info/id/ai-components/entity-extraction
 ```
 
 ## Adding Constants

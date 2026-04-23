@@ -6,7 +6,7 @@ from escape_helpers import sparql_escape_uri, sparql_escape_float
 from helpers import query, update
 
 from .ner import NERAnnotation
-from ..sparql_config import get_prefixes_for_query, GRAPHS
+from ..sparql_config import get_prefixes_for_query, GRAPHS, SPARQL_PREFIXES
 
 
 class RelationExtractionAnnotation(NERAnnotation):
@@ -14,13 +14,12 @@ class RelationExtractionAnnotation(NERAnnotation):
 
     def __init__(self, subject: str, predicate: str, obj: str, activity_id: str, source_uri: str,
                  start: Optional[int], end: Optional[int], agent: str, agent_type: str,
-                 confidence: float = 1.0, entity_class: Optional[str] = None):
+                 confidence: float = 1.0):
         super().__init__(activity_id, source_uri, predicate, start, end, agent, agent_type)
         self.predicate = predicate
         self.object = obj
         self.subject = subject
         self.confidence = confidence
-        self.entity_class = entity_class
 
     @classmethod
     def create_from_uri(cls, uri: str) -> Iterator['RelationExtractionAnnotation']:
@@ -40,9 +39,9 @@ class RelationExtractionAnnotation(NERAnnotation):
                   ?annotation a oa:Annotation ;
                                oa:hasTarget ?target .
                   ?target a oa:SpecificResource ;
-                          oa:source ?source .
+                          oa:hasSource ?source .
                   OPTIONAL {
-                      ?target oa:selector ?selector .
+                      ?target oa:hasSelector ?selector .
                       ?selector a oa:TextPositionSelector ;
                               oa:start ?start; oa:end ?end .
                   }
@@ -79,49 +78,50 @@ class RelationExtractionAnnotation(NERAnnotation):
         Returns:
             The URI of the created annotation
         """
-        annotation_uri = "http://example.org/{0}".format(uuid.uuid4())
-        part_of_id = sparql_escape_uri("http://www.example.org/id/.well-known/genid/{0}".format(uuid.uuid4()))
+        annotation_uri = "{0}{1}".format(SPARQL_PREFIXES["annotations"], uuid.uuid4())
+        specific_resources_uri = sparql_escape_uri("{0}{1}".format(SPARQL_PREFIXES["specific_resources"], uuid.uuid4()))
         uri = sparql_escape_uri(self.source_uri)
 
-        # Build skolem parts with actual values substituted
-        skolem_uri = f"skolem:{uuid.uuid4()}"
-        skolem_parts, skolem_filter = self._build_skolem_parts(
-            skolem_uri,
+        # Build statement parts with actual values substituted
+        statements_uri = sparql_escape_uri("{0}{1}".format(SPARQL_PREFIXES["statements"], uuid.uuid4()))
+        statement_parts, statement_filter = self._build_statement_parts(
+            statements_uri,
             sparql_escape_uri(self.subject),
             self.predicate,
             self.object,
-            self.entity_class
         )
 
         # Build selector parts with actual values substituted
         selector_part, selector_filter = self._build_selector_parts(
-            part_of_id, uri)
+            specific_resources_uri, uri)
 
         query_template = Template(
-            get_prefixes_for_query("ex", "oa", "mu", "prov", "foaf", "dct", "skolem", "nif", "rdf", "eli", "org",
-                                   "rdfs", "eli-dl") +
+            get_prefixes_for_query("ext", "oa", "mu", "prov", "foaf", "dct", 
+                                   "nif", "rdf", "eli", "org",
+                                   "rdfs", "eli-dl", "annotations", "expressions",
+                                   "locations", "people", "organizations",
+                                   "legal_expressions") +
             """
             INSERT {
               GRAPH $graph {
                   $activity_id a prov:Activity;
                      prov:generated $annotation_id;
-                     prov:wasAssociatedWith $user ;
-                     mu:uuid "$activity_uuid" .
+                     prov:wasAssociatedWith $user .
 
                   $annotation_id a oa:Annotation ;
                      mu:uuid "$id";
-                     oa:hasBody $skolem ;
+                     oa:hasBody $statements_uri ;
                      nif:confidence $confidence ;
                      oa:motivatedBy oa:linking ;
-                     oa:hasTarget $part_of_id .
-                  $skolem_parts
+                     oa:hasTarget $specific_resources_uri .
+                  $statement_parts
                   $selector_part
               }
             } WHERE {
               GRAPH $graph {
                   FILTER NOT EXISTS { 
                     ?existingAnn a oa:Annotation ;
-                        oa:hasBody ?existingSkolem ;
+                        oa:hasBody ?existingStatement ;
                         oa:motivatedBy oa:linking ;
                         oa:hasTarget ?existingTarget .
 
@@ -129,7 +129,7 @@ class RelationExtractionAnnotation(NERAnnotation):
                          prov:generated ?existingAnn ;
                          prov:wasAssociatedWith $user .
 
-                    $skolem_filter
+                    $statement_filter
                     $selector_filter
                   }
               }
@@ -138,18 +138,17 @@ class RelationExtractionAnnotation(NERAnnotation):
         query_string = query_template.substitute(
             id=str(uuid.uuid1()),
             annotation_id=sparql_escape_uri(annotation_uri),
-            activity_uuid=str(uuid.uuid4()),
             activity_id=sparql_escape_uri(self.activity_id),
             user=sparql_escape_uri(self.agent),
-            skolem=skolem_uri,
+            statements_uri=statements_uri,
             subject=sparql_escape_uri(self.subject),
             pred=self.predicate,  # Already escaped or prefixed name
             obj=self.object,  # Already escaped (string literal or URI)
             confidence=sparql_escape_float(self.confidence),
-            part_of_id=part_of_id,
-            skolem_parts=skolem_parts,
+            specific_resources_uri=specific_resources_uri,
+            statement_parts=statement_parts,
             selector_part=selector_part,
-            skolem_filter=skolem_filter,
+            statement_filter=statement_filter,
             selector_filter=selector_filter,
             graph=sparql_escape_uri(GRAPHS["ai"])
         )

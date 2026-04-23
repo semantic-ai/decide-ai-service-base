@@ -6,7 +6,7 @@ from escape_helpers import sparql_escape_uri
 from helpers import query, update
 
 from .base import Annotation
-from ..sparql_config import get_prefixes_for_query, GRAPHS
+from ..sparql_config import get_prefixes_for_query, GRAPHS, SPARQL_PREFIXES
 
 
 class LinkingAnnotation(Annotation):
@@ -62,14 +62,14 @@ class LinkingAnnotation(Annotation):
 
     def add_to_triplestore_if_not_exists(self):
         query_template = Template(
-            get_prefixes_for_query("ex", "oa", "mu", "prov", "foaf", "dct", "skolem", "nif") +
+            get_prefixes_for_query("ext", "oa", "mu", "prov", "foaf", 
+                                   "dct", "nif") +
             """
             INSERT {
               GRAPH $graph {
                   $activity_id a prov:Activity;
                      prov:generated $annotation_id;
-                     prov:wasAssociatedWith $user;
-                     mu:uuid "$activity_uuid" .
+                     prov:wasAssociatedWith $user .
 
                   $annotation_id a oa:Annotation ;
                                  mu:uuid "$id";
@@ -95,8 +95,7 @@ class LinkingAnnotation(Annotation):
             """)
         query_string = query_template.substitute(
             id=str(uuid.uuid1()),
-            activity_uuid=str(uuid.uuid4()),
-            annotation_id=sparql_escape_uri("http://example.org/{0}".format(uuid.uuid4())),
+            annotation_id=sparql_escape_uri("{0}{1}".format(SPARQL_PREFIXES["annotations"], uuid.uuid4())),
             activity_id=sparql_escape_uri(self.activity_id),
             uri=sparql_escape_uri(self.source_uri),
             user=sparql_escape_uri(self.agent),

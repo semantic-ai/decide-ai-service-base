@@ -25,7 +25,6 @@ SPARQL_PREFIXES = {
     "oa": "http://www.w3.org/ns/oa#",
     "dct": "http://purl.org/dc/terms/",
     "dcterms": "http://purl.org/dc/terms/",
-    "skolem": "http://www.example.org/id/.well-known/genid/",
     "nif": "http://persistence.uni-leipzig.org/nlp2rdf/ontologies/nif-core#",
     "locn": "http://www.w3.org/ns/locn#",
     "geosparql": "http://www.opengis.net/ont/geosparql#",
@@ -38,15 +37,26 @@ SPARQL_PREFIXES = {
     "nfo": "http://www.semanticdesktop.org/ontologies/2007/03/22/nfo#",
     "eli": "http://data.europa.eu/eli/ontology#",
     "eli-dl": "http://data.europa.eu/eli/eli-draft-legislation-ontology#",
-    "ns1": "http://www.w3.org/ns/dqv#",
-    "ns2": "https://w3id.org/okn/o/sd#",
-    "ns3": "https://w3id.org/airo#",
+    "dqv": "http://www.w3.org/ns/dqv#",
+    "sd": "https://w3id.org/okn/o/sd#",
     "schema": "https://schema.org/",
     "epvoc": "https://data.europarl.europa.eu/def/epvoc#",
     "nie": "http://www.semanticdesktop.org/ontologies/2007/01/19/nie#",
     "harvesting": "http://lblod.data.gift/vocabularies/harvesting/",
     "org": "http://www.w3.org/ns/org#",
-    "besluit": "http://data.vlaanderen.be/ns/besluit#"
+    "besluit": "http://data.vlaanderen.be/ns/besluit#",
+    "ext": "http://mu.semte.ch/vocabularies/ext/",
+    "annotations": "http://data.lblod.info/id/annotations/",
+    "expressions": "http://data.lblod.info/id/expressions/",
+    "locations": "http://data.lblod.info/id/locations/",
+    "people": "http://data.lblod.info/id/people/",
+    "organizations": "http://data.lblod.info/id/organizations/",
+    "legal_expressions": "http://data.lblod.info/id/legal-expressions/",
+    "works": "http://data.lblod.info/id/works/",
+    "linguistics_translations": "http://purl.org/linguistics/gold/translation",
+    "text_position_selectors": "http://data.lblod.info/id/text-position-selectors/",
+    "statements": "http://data.lblod.info/id/statements/",
+    "specific_resources": "http://data.lblod.info/id/specific-resources/"
 }
 
 # ==============================================================================
@@ -106,6 +116,9 @@ TASK_OPERATIONS = {
     "segmentation": "http://lblod.data.gift/id/jobs/concept/TaskOperation/segmenting",
     "pdf_scraping": "http://lblod.data.gift/id/jobs/concept/TaskOperation/pdf-scraping",
     "pdf_content_extraction": "http://lblod.data.gift/id/jobs/concept/TaskOperation/pdf-to-eli",
+    "codelist_annotation": "http://lblod.data.gift/id/jobs/concept/TaskOperation/codelist-matching/annotate",
+    "codelist_training": "http://lblod.data.gift/id/jobs/concept/TaskOperation/codelist-matching/train",
+    "codelist_assess_impact": "http://lblod.data.gift/id/jobs/concept/TaskOperation/codelist-matching/assess-impact",
 }
 
 # ==============================================================================
@@ -122,11 +135,12 @@ AGENT_TYPES = {
 # ==============================================================================
 
 AI_COMPONENTS = {
-    "ner_extractor": "http://example.org/entity-extraction",
-    "model_annotater": "http://example.org/model_annotation",
-    "decide_system": "http://example.org/DECIDe",
-    "translator": "http://example.org/translation",
-    "segmenter": "http://example.org/segmentation",
+    "ner_extractor": "http://data.lblod.info/id/ai-components/entity-extraction",
+    "model_annotater": "http://data.lblod.info/id/ai-components/model-annotation",
+    "decide_system": "http://data.lblod.info/id/ai-components/DECIDe",
+    "translator": "http://data.lblod.info/id/ai-components/translation",
+    "segmenter": "http://data.lblod.info/id/ai-components/segmentation",
+    "linker": "http://data.lblod.info/id/ai-components/linking",
 }
 
 # ==============================================================================
