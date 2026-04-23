@@ -78,7 +78,8 @@ class RelationExtractionAnnotation(NERAnnotation):
         Returns:
             The URI of the created annotation
         """
-        annotation_uri = "{0}{1}".format(SPARQL_PREFIXES["annotations"], uuid.uuid4())
+        annotation_uuid = str(uuid.uuid4())
+        annotation_uri = "{0}{1}".format(SPARQL_PREFIXES["annotations"], annotation_uuid)
         specific_resources_uri = sparql_escape_uri("{0}{1}".format(SPARQL_PREFIXES["specific_resources"], uuid.uuid4()))
         uri = sparql_escape_uri(self.source_uri)
 
@@ -136,7 +137,7 @@ class RelationExtractionAnnotation(NERAnnotation):
             }
             """)
         query_string = query_template.substitute(
-            id=str(uuid.uuid1()),
+            id=annotation_uuid,
             annotation_id=sparql_escape_uri(annotation_uri),
             activity_id=sparql_escape_uri(self.activity_id),
             user=sparql_escape_uri(self.agent),

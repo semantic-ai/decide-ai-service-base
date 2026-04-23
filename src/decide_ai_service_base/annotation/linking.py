@@ -60,7 +60,13 @@ class LinkingAnnotation(Annotation):
             yield cls(item['activity']['value'], uri, item['body']['value'], item['agent']['value'],
                       item['agentType']['value'])
 
-    def add_to_triplestore_if_not_exists(self):
+    def add_to_triplestore_if_not_exists(self) -> str:
+        """
+        Insert this annotation into the triplestore.
+
+        Returns:
+            The URI of the created annotation
+        """
         query_template = Template(
             get_prefixes_for_query("ext", "oa", "mu", "prov", "foaf", 
                                    "dct", "nif") +
@@ -93,9 +99,12 @@ class LinkingAnnotation(Annotation):
               }
             }
             """)
+        annotation_uuid = str(uuid.uuid4())
+        annotation_uri = "{0}{1}".format(SPARQL_PREFIXES["annotations"], annotation_uuid)
+
         query_string = query_template.substitute(
-            id=str(uuid.uuid1()),
-            annotation_id=sparql_escape_uri("{0}{1}".format(SPARQL_PREFIXES["annotations"], uuid.uuid4())),
+            id=annotation_uuid,
+            annotation_id=sparql_escape_uri(annotation_uri),
             activity_id=sparql_escape_uri(self.activity_id),
             uri=sparql_escape_uri(self.source_uri),
             user=sparql_escape_uri(self.agent),
@@ -108,3 +117,4 @@ class LinkingAnnotation(Annotation):
             error_msg = f"Failed to insert LinkingAnnotation to triplestore for source {self.source_uri}: {e}"
             self.logger.error(error_msg, exc_info=True)
             raise RuntimeError(error_msg) from e
+        return annotation_uri
