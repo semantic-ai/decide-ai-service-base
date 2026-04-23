@@ -15,8 +15,12 @@ class Annotation(ABC):
         self.logger = logging.getLogger(__name__)
 
     @abstractmethod
-    def add_to_triplestore_if_not_exists(self):
-        """Insert this annotation into the triplestore."""
+    def add_to_triplestore_if_not_exists(self) -> str:
+        """Insert this annotation into the triplestore.
+        
+        Returns:
+            The URI of the created annotation
+        """
         pass
 
     @classmethod
