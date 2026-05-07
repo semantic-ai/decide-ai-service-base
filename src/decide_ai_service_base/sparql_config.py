@@ -135,12 +135,28 @@ AGENT_TYPES = {
 # ==============================================================================
 
 AI_COMPONENTS = {
-    "ner_extractor": "http://data.lblod.info/id/ai-components/entity-extraction",
-    "model_annotater": "http://data.lblod.info/id/ai-components/model-annotation",
+
+    #codelist-matching-service
+    "classifier_annotater": "http://lblod.data.gift/id/components/codelist-classification/v1.0.0",
+    "model_annotater": "http://lblod.data.gift/id/components/codelist-annotation/v1.0.0",
+    "impact_annotator": "http://lblod.data.gift/id/components/impact-assessment/v1.0.0",
+
+    #Named entity recognition (the geocoding-service)
+    "ner_extractor": "http://data.gift/id/components/entity-extraction/v1.0.0",
+    "translator": "http://data.gift/id/components/translation/v1.0.0",
+    "segmenter": "http://data.gift/id/components/segmentation/v1.0.0",
+    "codelist_trainer": "http://lblod.data.gift/id/components/codelist-training/v1.0.0", #unused
+
+    #Named entity linking (doesnt use base-service, but for consistency)
+    "linker": "http://data.gift/id/components/named-entity-linking/v1.0.0",
+    
+    #PDF scraping and content extraction
+    "content_extraction": "http://lblod.data.gift/id/components/pdf-to-eli/v1.0.0",
+
+    #other
     "decide_system": "http://data.lblod.info/id/ai-components/DECIDe",
-    "translator": "http://data.lblod.info/id/ai-components/translation",
-    "segmenter": "http://data.lblod.info/id/ai-components/segmentation",
-    "linker": "http://data.lblod.info/id/ai-components/linking",
+    
+    
 }
 
 # ==============================================================================
