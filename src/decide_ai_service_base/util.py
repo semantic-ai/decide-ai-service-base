@@ -5,7 +5,7 @@ from string import Template
 from escape_helpers import sparql_escape_uri
 from helpers import query, log, update
 
-from .sparql_config import get_prefixes_for_query, GRAPHS, JOB_STATUSES, TASK_OPERATIONS, prefixed_log
+from .sparql_config import get_prefixes_for_query, GRAPHS, JOB_STATUSES, prefixed_log
 from .task import Task
 
 
@@ -46,7 +46,7 @@ def process_open_tasks():
 
 def get_one_open_task() -> str | None:
     # Format VALUES clause properly - each URI on its own line, properly escaped
-    operations = "\n                ".join(sparql_escape_uri(value) for value in TASK_OPERATIONS.values())
+    operations = "\n                ".join(sparql_escape_uri(value) for value in Task.supported_operations())
     q = f"""
         {get_prefixes_for_query("task", "adms")}
         SELECT ?task WHERE {{
@@ -77,7 +77,7 @@ def fail_busy_and_scheduled_tasks():
     """
     prefixed_log("Startup: failing busy tasks if there are any")
 
-    operations = TASK_OPERATIONS.values()
+    operations = Task.supported_operations()
 
     # Build the VALUES clause dynamically
     operations_values = " ".join(sparql_escape_uri(op) for op in operations)
