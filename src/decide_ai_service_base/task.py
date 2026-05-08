@@ -145,8 +145,8 @@ class Task(ABC):
             error_message = f"Task {self.task_uri} failed: {type(e).__name__}: {str(e)}"
             self.logger.error(error_message, exc_info=True)
             try:
-                write_error_log(self.task_uri, error_message)
                 self.change_state("failed")
+                write_error_log(self.task_uri, error_message)                
             except Exception as state_error:
                 self.logger.error(
                     f"Failed to update task {self.task_uri} status to failed: {state_error}")
