@@ -2,7 +2,7 @@ import logging
 import time
 from string import Template
 
-from escape_helpers import sparql_escape_uri
+from escape_helpers import sparql_escape_uri, sparql_escape_string
 from helpers import query, log, update
 
 from .sparql_config import get_prefixes_for_query, GRAPHS, JOB_STATUSES, prefixed_log
@@ -113,3 +113,38 @@ def fail_busy_and_scheduled_tasks():
     ).substitute(graph=sparql_escape_uri(GRAPHS["jobs"]))
 
     update(q, sudo=True)
+
+def write_error_log(task_uri, error_message):
+    import uuid
+    container_id = str(uuid.uuid4())
+    container_uri = f"http://data.lblod.info/id/data-container/{container_id}"
+    error_uuid = str(uuid.uuid4())
+    error_uri = f"http://data.lblod.info/id/error-message/{error_uuid}"
+
+    q = Template(
+        get_prefixes_for_query("task", "nfo", "mu", "ext", "dct") +
+        """
+        INSERT DATA {
+            GRAPH $graph {
+                $task task:resultsContainer $container .
+                $container a nfo:DataContainer ;
+                    mu:uuid $uuid ;
+                    task:hasResource $error_uri .
+                $error_uri a ext:ErrorMessage ;
+                    mu:uuid $error_uuid ;
+                    dct:description $error .
+            }
+        }
+        """
+    ).substitute(
+        graph=sparql_escape_uri(GRAPHS["data_containers"]),
+        container=sparql_escape_uri(container_uri),
+        uuid=sparql_escape_string(container_id),
+        error=sparql_escape_string(error_message),
+        error_uuid=sparql_escape_string(error_uuid),
+        error_uri=sparql_escape_uri(error_uri),
+        task=sparql_escape_uri(task_uri)
+    )
+
+    update(q, sudo=True)
+    return container_uri
