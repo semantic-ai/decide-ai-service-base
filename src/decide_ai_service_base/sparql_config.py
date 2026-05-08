@@ -65,6 +65,8 @@ SPARQL_PREFIXES = {
 # Named graphs in the RDF store
 
 GRAPHS = {
+    # SHARED GRAPHS
+    "public": os.getenv('PUBLIC_GRAPH', "http://mu.semte.ch/graphs/public"),
     # INPUT GRAPHS
     "jobs": os.getenv('JOB_GRAPH', "http://mu.semte.ch/graphs/jobs"),
     "data_containers": os.getenv('DATA_CONTAINER_GRAPH', "http://mu.semte.ch/graphs/data-containers"),
@@ -118,6 +120,7 @@ TASK_OPERATIONS = {
     "pdf_content_extraction": "http://lblod.data.gift/id/jobs/concept/TaskOperation/pdf-to-eli",
     "codelist_annotation": "http://lblod.data.gift/id/jobs/concept/TaskOperation/codelist-matching/annotate",
     "codelist_training": "http://lblod.data.gift/id/jobs/concept/TaskOperation/codelist-matching/train",
+    "codelist_classifier_annotation": "http://lblod.data.gift/id/jobs/concept/TaskOperation/codelist-matching/classifier-annotate",
     "codelist_assess_impact": "http://lblod.data.gift/id/jobs/concept/TaskOperation/codelist-matching/assess-impact",
 }
 
