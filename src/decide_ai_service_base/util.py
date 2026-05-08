@@ -46,7 +46,7 @@ def process_open_tasks():
 
 def get_one_open_task() -> str | None:
     # Format VALUES clause properly - each URI on its own line, properly escaped
-    operations = "\n                ".join(sparql_escape_uri(value) for value in Task.supported_operations())
+    operations = "\n                ".join(sparql_escape_uri(value.__task_type__) for value in Task.supported_operations())
     q = f"""
         {get_prefixes_for_query("task", "adms")}
         SELECT ?task WHERE {{
@@ -80,7 +80,7 @@ def fail_busy_and_scheduled_tasks():
     operations = Task.supported_operations()
 
     # Build the VALUES clause dynamically
-    operations_values = " ".join(sparql_escape_uri(op) for op in operations)
+    operations_values = " ".join(sparql_escape_uri(op.__task_type__) for op in operations)
 
     q = Template(
         get_prefixes_for_query("task", "adms", "dct") +
