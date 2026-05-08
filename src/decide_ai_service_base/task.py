@@ -141,9 +141,11 @@ class Task(ABC):
             yield
             self.change_state("success")
         except Exception as e:
-            self.logger.error(
-                f"Task {self.task_uri} failed: {type(e).__name__}: {str(e)}", exc_info=True)
+            from .util import write_error_log
+            error_message = f"Task {self.task_uri} failed: {type(e).__name__}: {str(e)}"
+            self.logger.error(error_message, exc_info=True)
             try:
+                write_error_log(self.task_uri, error_message)
                 self.change_state("failed")
             except Exception as state_error:
                 self.logger.error(
