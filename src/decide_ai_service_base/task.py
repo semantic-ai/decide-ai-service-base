@@ -8,7 +8,6 @@ from typing import Optional, Type
 from escape_helpers import sparql_escape_uri, sparql_escape_datetime
 from helpers import query, update, log, logger
 
-from .util import start_and_end_to_xsd_duration
 from .sparql_config import get_prefixes_for_query, GRAPHS, JOB_STATUSES
 
 
@@ -72,7 +71,7 @@ class Task(ABC):
 
     def change_state(self, new_state: str) -> None:
         """Update the task status in the triplestore."""
-
+        from .util import start_and_end_to_xsd_duration
         # 1. Batch-insert results containers (if any)
         if self.results_container_uris:
             BATCH_SIZE = 50
