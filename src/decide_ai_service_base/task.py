@@ -64,50 +64,7 @@ class Task(ABC):
     def change_state(self, new_state: str) -> None:
         """Update the task status in the triplestore."""
 
-        # 1. Delete any existing status
-        delete_query = Template(
-            get_prefixes_for_query("task", "adms") +
-            """
-            DELETE {
-            GRAPH $graph {
-                ?task adms:status ?status .
-            }
-            }
-            WHERE {
-            GRAPH $graph {
-                VALUES ?task {
-                  $task
-                }
-                ?task adms:status ?status .
-            }
-            }
-            """
-        )
-
-        update(delete_query.substitute(
-            task=sparql_escape_uri(self.task_uri),
-            graph=sparql_escape_uri(GRAPHS["jobs"])
-        ), sudo=True)
-
-        # 2. Insert the new status
-        insert_query = Template(
-            get_prefixes_for_query("task", "adms") +
-            """
-            INSERT DATA {
-            GRAPH $graph {
-                $task adms:status $new_status .
-            }
-            }
-            """
-        )
-
-        update(insert_query.substitute(
-            new_status=sparql_escape_uri(JOB_STATUSES[new_state]),
-            task=sparql_escape_uri(self.task_uri),
-            graph=sparql_escape_uri(GRAPHS["jobs"])
-        ), sudo=True)
-
-        # Batch-insert results containers (if any)
+        # 1. Batch-insert results containers (if any)
         if self.results_container_uris:
             BATCH_SIZE = 50
             insert_template = Template(
@@ -132,6 +89,37 @@ class Task(ABC):
                     graph=sparql_escape_uri(GRAPHS["jobs"])
                 )
                 update(query_string, sudo=True)
+            
+        # 2. Update any existing status
+        update_query = Template(
+            get_prefixes_for_query("task", "adms") +
+            """
+            DELETE {
+            GRAPH $graph {
+                ?task adms:status ?status .
+            }
+            }
+            INSERT {
+            GRAPH $graph {
+                $task adms:status $new_status .
+            }
+            }
+            WHERE {
+            GRAPH $graph {
+                VALUES ?task {
+                  $task
+                }
+                ?task adms:status ?status .
+            }
+            }
+            """
+        )
+
+        update(update_query.substitute(
+            new_status=sparql_escape_uri(JOB_STATUSES[new_state]),
+            task=sparql_escape_uri(self.task_uri),
+            graph=sparql_escape_uri(GRAPHS["jobs"])
+        ), sudo=True)
 
     @contextlib.contextmanager
     def run(self):
