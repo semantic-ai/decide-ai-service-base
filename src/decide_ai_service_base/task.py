@@ -1,12 +1,14 @@
 import contextlib
+from datetime import datetime, timezone
 import logging
 from abc import ABC, abstractmethod
 from string import Template
 from typing import Optional, Type
 
-from escape_helpers import sparql_escape_uri
-from helpers import query, update
+from escape_helpers import sparql_escape_uri, sparql_escape_datetime
+from helpers import query, update, log, logger
 
+from .util import start_and_end_to_xsd_duration
 from .sparql_config import get_prefixes_for_query, GRAPHS, JOB_STATUSES
 
 
@@ -17,8 +19,15 @@ class Task(ABC):
         super().__init__()
         self.task_uri = task_uri
         self.results_container_uris = []
-        self.logger = logging.getLogger(self.__class__.__name__)
         self.source: Optional[str] = None
+        self.start_time: Optional[datetime] = None
+        self.end_time: Optional[datetime] = None
+
+    @property
+    def duration_in_seconds(self) -> int | None:
+        if self.end_time is not None and self.start_time is not None:
+            return (self.end_time - self.start_time).total_seconds()
+        return None
 
     @classmethod
     def supported_operations(cls) -> list[Type['Task']]:
@@ -64,50 +73,7 @@ class Task(ABC):
     def change_state(self, new_state: str) -> None:
         """Update the task status in the triplestore."""
 
-        # 1. Delete any existing status
-        delete_query = Template(
-            get_prefixes_for_query("task", "adms") +
-            """
-            DELETE {
-            GRAPH $graph {
-                ?task adms:status ?status .
-            }
-            }
-            WHERE {
-            GRAPH $graph {
-                VALUES ?task {
-                  $task
-                }
-                ?task adms:status ?status .
-            }
-            }
-            """
-        )
-
-        update(delete_query.substitute(
-            task=sparql_escape_uri(self.task_uri),
-            graph=sparql_escape_uri(GRAPHS["jobs"])
-        ), sudo=True)
-
-        # 2. Insert the new status
-        insert_query = Template(
-            get_prefixes_for_query("task", "adms") +
-            """
-            INSERT DATA {
-            GRAPH $graph {
-                $task adms:status $new_status .
-            }
-            }
-            """
-        )
-
-        update(insert_query.substitute(
-            new_status=sparql_escape_uri(JOB_STATUSES[new_state]),
-            task=sparql_escape_uri(self.task_uri),
-            graph=sparql_escape_uri(GRAPHS["jobs"])
-        ), sudo=True)
-
-        # Batch-insert results containers (if any)
+        # 1. Batch-insert results containers (if any)
         if self.results_container_uris:
             BATCH_SIZE = 50
             insert_template = Template(
@@ -132,25 +98,95 @@ class Task(ABC):
                     graph=sparql_escape_uri(GRAPHS["jobs"])
                 )
                 update(query_string, sudo=True)
+            
+        # Calculate duration if start_time and end_time is available and we're transitioning to a terminal state
+        duration = None
+        if self.start_time and self.end_time and self.start_time and new_state in ("success", "failed"):
+            duration = start_and_end_to_xsd_duration(self.end_time, self.start_time)
+            
+        duration_insert = f'?task schema:duration {sparql_escape_string(duration)}^^xsd:duration .' if duration else ""
+        duration_delete = '?task schema:duration ?duration .' if duration else ""
+        duration_optional = 'OPTIONAL { ?task schema:duration ?duration . }' if duration else ""
+
+        # 2. Update any existing status
+        update_query = Template(
+            get_prefixes_for_query("task", "adms", "dct", "schema", "xsd") +
+            """
+            DELETE {
+            GRAPH $graph {
+                ?task adms:status ?status .
+                ?task dct:modified ?modified.
+                $duration_delete
+            }
+            }
+            INSERT {
+            GRAPH $graph {
+                ?task adms:status $new_status .
+                ?task dct:modified $modified .
+                ?task schema:duration ?new_duration .
+                $duration_insert
+            }
+            }
+            WHERE {
+            GRAPH $graph {
+                VALUES ?task {
+                  $task
+                }
+                ?task adms:status ?status .
+                OPTIONAL { ?task dct:modified ?modified. }
+                OPTIONAL { ?task schema:duration ?duration .}
+                $duration_optional
+            }
+            }
+            """
+        )
+
+        update(update_query.substitute(
+            modified=sparql_escape_datetime(datetime.datetime.now()),
+            new_status=sparql_escape_uri(JOB_STATUSES[new_state]),
+            task=sparql_escape_uri(self.task_uri),
+            graph=sparql_escape_uri(GRAPHS["jobs"]),
+            duration_delete=duration_delete,
+            duration_insert=duration_insert,
+            duration_optional=duration_optional
+        ), sudo=True)
 
     @contextlib.contextmanager
     def run(self):
         """Context manager for task execution with state transitions."""
-        self.change_state("busy")
+        error_message = None
+        new_state = None
         try:
+            # This is the success path
+            self.change_state("busy")
+            self.start_time = datetime.now(timezone.utc)
             yield
-            self.change_state("success")
+            self.end_time = datetime.now(timezone.utc)
+            new_state = "success"
         except Exception as e:
+            # In case anything is wrong, write the error & prepare an error message
             from .util import write_error_log
             error_message = f"Task {self.task_uri} failed: {type(e).__name__}: {str(e)}"
-            self.logger.error(error_message, exc_info=True)
-            try:
-                self.change_state("failed")
-                write_error_log(self.task_uri, error_message)                
-            except Exception as state_error:
-                self.logger.error(
-                    f"Failed to update task {self.task_uri} status to failed: {state_error}")
+            new_state = "failed"
+            self.end_time = datetime.now(timezone.utc)
+            logger.error(error_message, exc_info=True)
             raise
+        finally:
+            # Always update the state at the end, in case of faillure also write the error log to the triple store
+            # Handle exceptions in case of a DB faillure.
+            if new_state:
+                try:
+                    self.change_state(new_state)
+                except Exception as state_error:
+                    logger.error(f"Failed to update task {self.task_uri} status to {new_state}: {state_error}")
+
+            if error_message and new_state == "failed":
+                try:
+                    write_error_log(self.task_uri, error_message)
+                except Exception:
+                    logger.error(f"Failed to write error log for task {self.task_uri}")
+
+            log("Task {0} ended (final status {2}, duration {1} seconds)".format(self.task_uri, self.duration_in_seconds, new_state))
 
     def execute(self):
         """Run the task and handle state transitions."""
@@ -280,7 +316,7 @@ class DecisionTask(Task, ABC):
         r = query(q, sudo=True)
         bindings = r.get("results", {}).get("bindings", [])
         if not bindings or "source" not in bindings[0] or "value" not in bindings[0].get("source", {}):
-            self.logger.warning(f"No source found for task {task_uri}")
+            logger.warning(f"No source found for task {task_uri}")
             self.source = None
         else:
             self.source = bindings[0]["source"]["value"]
@@ -348,10 +384,10 @@ class DecisionTask(Task, ABC):
         bindings = query_result.get("results", {}).get("bindings", [])
         if bindings and "work" in bindings[0]:
             work_uri = bindings[0]["work"]["value"]
-            self.logger.info(
+            logger.info(
                 f"Found work {work_uri} for expression {self.source}")
             return work_uri
 
-        self.logger.warning(
+        logger.warning(
             f"No eli:realizes work found for expression {self.source}")
         return None
