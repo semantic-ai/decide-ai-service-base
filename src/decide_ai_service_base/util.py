@@ -166,4 +166,4 @@ def start_and_end_to_xsd_duration(start: datetime, end: datetime) -> str:
         f"{seconds}S" if seconds else "",
     ])
 
-    return f"{sign}P{date_part}" + (f"T{time_part}" if time_part else "") or "PT0S"
+    return f"{sign}P{date_part}" + (f"T{time_part}" if time_part else "T0S")

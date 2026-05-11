@@ -97,57 +97,47 @@ class Task(ABC):
                     graph=sparql_escape_uri(GRAPHS["jobs"])
                 )
                 update(query_string, sudo=True)
-            
-        # Calculate duration if start_time and end_time is available and we're transitioning to a terminal state
-        duration = None
-        if self.start_time and self.end_time and self.start_time and new_state in ("success", "failed"):
-            duration = start_and_end_to_xsd_duration(self.end_time, self.start_time)
-            
-        duration_insert = f'?task schema:duration {sparql_escape_string(duration)}^^xsd:duration .' if duration else ""
-        duration_delete = '?task schema:duration ?duration .' if duration else ""
-        duration_optional = 'OPTIONAL { ?task schema:duration ?duration . }' if duration else ""
-
+        
         # 2. Update any existing status
         update_query = Template(
-            get_prefixes_for_query("task", "adms", "dct", "schema", "xsd") +
+            get_prefixes_for_query("task", "adms", "ext", "dct", "schema", "xsd") +
             """
             DELETE {
-            GRAPH $graph {
-                ?task adms:status ?status .
-                ?task dct:modified ?modified.
-                $duration_delete
-            }
+                GRAPH $graph {
+                    ?task adms:status ?status .
+                    ?task dct:modified ?modified .
+                    ?task ext:startedAt ?started .
+                    ?task ext:endedAt ?ended .
+                }
             }
             INSERT {
-            GRAPH $graph {
-                ?task adms:status $new_status .
-                ?task dct:modified $modified .
-                ?task schema:duration ?new_duration .
-                $duration_insert
-            }
+                GRAPH $graph {
+                    ?task adms:status $new_status .
+                    ?task dct:modified $modified .
+                    $times
+                }
             }
             WHERE {
-            GRAPH $graph {
-                VALUES ?task {
-                  $task
+                GRAPH $graph {
+                    VALUES ?task {
+                        $task
+                    }
+                    ?task a task:Task .
+                    OPTIONAL { ?task adms:status ?status . }
+                    OPTIONAL { ?task dct:modified ?modified. }
+                    OPTIONAL { ?task ext:startedAt ?started . }
+                    OPTIONAL { ?task ext:endedAt ?ended . }
                 }
-                ?task adms:status ?status .
-                OPTIONAL { ?task dct:modified ?modified. }
-                OPTIONAL { ?task schema:duration ?duration .}
-                $duration_optional
-            }
             }
             """
         )
 
         update(update_query.substitute(
-            modified=sparql_escape_datetime(datetime.datetime.now()),
+            modified=sparql_escape_datetime(datetime.now()),
             new_status=sparql_escape_uri(JOB_STATUSES[new_state]),
             task=sparql_escape_uri(self.task_uri),
             graph=sparql_escape_uri(GRAPHS["jobs"]),
-            duration_delete=duration_delete,
-            duration_insert=duration_insert,
-            duration_optional=duration_optional
+            times=f"?task ext:startedAt {sparql_escape_datetime(self.start_time)} . ?task ext:endedAt {sparql_escape_datetime(self.end_time)}" if self.start_time and self.end_time else ""
         ), sudo=True)
 
     @contextlib.contextmanager
