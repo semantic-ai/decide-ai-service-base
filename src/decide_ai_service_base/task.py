@@ -24,7 +24,7 @@ class Task(ABC):
         self.end_time: Optional[datetime] = None
 
     @property
-    def durationInSeconds(self) -> int | None:
+    def duration_in_seconds(self) -> int | None:
         if self.end_time is not None and self.start_time is not None:
             return (self.end_time - self.start_time).total_seconds()
         return None
@@ -186,7 +186,7 @@ class Task(ABC):
                 except Exception:
                     logger.error(f"Failed to write error log for task {self.task_uri}")
 
-            log("Task {0} ended (final status {2}, duration {1} seconds)".format(self.task_uri, self.durationInSeconds, new_state))
+            log("Task {0} ended (final status {2}, duration {1} seconds)".format(self.task_uri, self.duration_in_seconds, new_state))
 
     def execute(self):
         """Run the task and handle state transitions."""
