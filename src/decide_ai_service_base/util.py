@@ -1,3 +1,4 @@
+import datetime
 import logging
 import time
 from string import Template
@@ -148,3 +149,21 @@ def write_error_log(task_uri, error_message):
 
     update(q, sudo=True)
     return container_uri
+
+def start_and_end_to_xsd_duration(start: datetime, end: datetime) -> str:
+    total_seconds = int((end - start).total_seconds())
+    sign = "-" if total_seconds < 0 else ""
+    total_seconds = abs(total_seconds)
+
+    days, remainder = divmod(total_seconds, 86400)
+    hours, remainder = divmod(remainder, 3600)
+    minutes, seconds = divmod(remainder, 60)
+
+    date_part = f"{days}D" if days else ""
+    time_part = "".join([
+        f"{hours}H" if hours else "",
+        f"{minutes}M" if minutes else "",
+        f"{seconds}S" if seconds else "",
+    ])
+
+    return f"{sign}P{date_part}" + (f"T{time_part}" if time_part else "") or "PT0S"
