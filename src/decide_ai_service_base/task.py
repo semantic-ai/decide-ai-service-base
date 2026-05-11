@@ -1,10 +1,12 @@
 import contextlib
+from datetime import datetime, timezone
 import logging
 from abc import ABC, abstractmethod
 from string import Template
 from typing import Optional, Type
 
-from escape_helpers import sparql_escape_uri
+from decide_ai_service_base.util import start_and_end_to_xsd_duration
+from escape_helpers import sparql_escape_uri, sparql_escape_datetime
 from helpers import query, update
 
 from .sparql_config import get_prefixes_for_query, GRAPHS, JOB_STATUSES
@@ -19,6 +21,8 @@ class Task(ABC):
         self.results_container_uris = []
         self.logger = logging.getLogger(self.__class__.__name__)
         self.source: Optional[str] = None
+        self.start_time: Optional[datetime] = None
+        self.end_time: Optional[datetime] = None
 
     @classmethod
     def supported_operations(cls) -> list[Type['Task']]:
@@ -90,18 +94,32 @@ class Task(ABC):
                 )
                 update(query_string, sudo=True)
             
+        # Calculate duration if start_time and end_time is available and we're transitioning to a terminal state
+        duration = None
+        if self.start_time and self.end_time and self.start_time and new_state in ("success", "failed"):
+            duration = start_and_end_to_xsd_duration(self.end_time, self.start_time)
+            
+        duration_insert = f'?task schema:duration {sparql_escape_string(duration)}^^xsd:duration .' if duration else ""
+        duration_delete = '?task schema:duration ?duration .' if duration else ""
+        duration_optional = 'OPTIONAL { ?task schema:duration ?duration . }' if duration else ""
+
         # 2. Update any existing status
         update_query = Template(
-            get_prefixes_for_query("task", "adms") +
+            get_prefixes_for_query("task", "adms", "dct", "schema", "xsd") +
             """
             DELETE {
             GRAPH $graph {
                 ?task adms:status ?status .
+                ?task dct:modified ?modified.
+                """ + duration_delete + """
             }
             }
             INSERT {
             GRAPH $graph {
-                $task adms:status $new_status .
+                ?task adms:status $new_status .
+                ?task dct:modified $modified .
+                ?task schema:duration ?new_duration .
+                """ + duration_insert + """
             }
             }
             WHERE {
@@ -110,12 +128,16 @@ class Task(ABC):
                   $task
                 }
                 ?task adms:status ?status .
+                OPTIONAL { ?task dct:modified ?modified. }
+                OPTIONAL { ?task schema:duration ?duration .}
+                """ + duration_optional + """
             }
             }
             """
         )
 
         update(update_query.substitute(
+            modified=sparql_escape_datetime(datetime.datetime.now()),
             new_status=sparql_escape_uri(JOB_STATUSES[new_state]),
             task=sparql_escape_uri(self.task_uri),
             graph=sparql_escape_uri(GRAPHS["jobs"])
@@ -126,7 +148,9 @@ class Task(ABC):
         """Context manager for task execution with state transitions."""
         self.change_state("busy")
         try:
+            self.start_time = datetime.now(timezone.utc)
             yield
+            self.end_time = datetime.now(timezone.utc)
             self.change_state("success")
         except Exception as e:
             from .util import write_error_log
