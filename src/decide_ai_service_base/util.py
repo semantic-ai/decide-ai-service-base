@@ -1,10 +1,9 @@
 import datetime
-import logging
 import time
 from string import Template
 
 from escape_helpers import sparql_escape_uri, sparql_escape_string
-from helpers import query, log, update
+from helpers import query, log, update, logger
 
 from .sparql_config import get_prefixes_for_query, GRAPHS, JOB_STATUSES, prefixed_log
 from .task import Task
@@ -32,7 +31,6 @@ def wait_for_triplestore():
 
 
 def process_open_tasks():
-    logger = logging.getLogger(__name__)
     logger.info("Checking for open tasks...")
     uri = get_one_open_task()
     while uri is not None:
@@ -67,7 +65,6 @@ def get_one_open_task() -> str | None:
         if bindings and "task" in bindings[0]:
             return bindings[0]["task"]["value"]
     except Exception as e:
-        logger = logging.getLogger(__name__)
         logger.error(f"Error querying for open tasks: {e}", exc_info=True)
     return None
 
