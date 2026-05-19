@@ -2,6 +2,7 @@ import datetime
 import time
 from string import Template
 from threading import Lock
+from typing import Optional
 
 from escape_helpers import sparql_escape_uri, sparql_escape_string
 from helpers import query, log, update, logger
@@ -32,7 +33,7 @@ def wait_for_triplestore():
 
 
 class TaskProcessor:
-    def __init__(self, lock: Lock | None = None):
+    def __init__(self, lock: Optional[Lock] = None):
         super().__init__()
         self.lock = lock
 

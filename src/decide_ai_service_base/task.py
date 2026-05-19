@@ -15,7 +15,7 @@ from .sparql_config import get_prefixes_for_query, GRAPHS, JOB_STATUSES
 class Task(ABC):
     """Base class for background tasks that process data from the triplestore."""
 
-    def __init__(self, task_uri: str, lock: Lock | None = None):
+    def __init__(self, task_uri: str, lock: Optional[Lock] = None):
         super().__init__()
         self.task_uri = task_uri
         self.results_container_uris = []
@@ -59,7 +59,7 @@ class Task(ABC):
         return None
 
     @classmethod
-    def from_uri(cls, task_uri: str, lock: Lock | None) -> 'Task':
+    def from_uri(cls, task_uri: str, lock: Optional[Lock]) -> 'Task':
         """Create a Task instance from its URI in the triplestore."""
         q = Template(
             get_prefixes_for_query("adms", "task") +
