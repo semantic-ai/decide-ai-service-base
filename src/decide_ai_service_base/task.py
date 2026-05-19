@@ -295,8 +295,8 @@ class Task(ABC):
 class DecisionTask(Task, ABC):
     """Task that processes decision-making data with input and output containers."""
 
-    def __init__(self, task_uri: str):
-        super().__init__(task_uri)
+    def __init__(self, task_uri: str, *args, **kwargs):
+        super().__init__(task_uri, *args, **kwargs)
         self.source_graph: Optional[str] = None
 
         q = Template(
