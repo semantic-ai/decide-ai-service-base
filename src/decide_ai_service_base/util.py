@@ -1,6 +1,7 @@
 import datetime
 import time
 from string import Template
+from threading import Lock
 
 from escape_helpers import sparql_escape_uri, sparql_escape_string
 from helpers import query, log, update, logger
@@ -30,17 +31,27 @@ def wait_for_triplestore():
     log("Triplestore ready!")
 
 
-def process_open_tasks():
-    logger.info("Checking for open tasks...")
-    uri = get_one_open_task()
-    while uri is not None:
-        logger.info(f"Processing {uri}")
-        try:
-            task = Task.from_uri(uri)
-            task.execute()
-        except Exception as e:
-            logger.error(f"Error processing task {uri}: {e}", exc_info=True)
+class TaskProcessor:
+    def __init__(self, lock: Lock | None = None):
+        super().__init__()
+        self.lock = lock
+
+    def __call__(self):
+        logger.info("Checking for open tasks...")
         uri = get_one_open_task()
+        while uri is not None:
+            logger.info(f"Processing {uri}")
+            try:
+                task = Task.from_uri(uri, lock=self.lock)
+                task.execute()
+            except Exception as e:
+                logger.error(f"Error processing task {uri}: {e}", exc_info=True)
+            uri = get_one_open_task()
+
+
+def process_open_tasks():
+    processor = TaskProcessor()
+    processor()
 
 
 def get_one_open_task() -> str | None:

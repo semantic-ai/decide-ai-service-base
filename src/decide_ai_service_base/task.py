@@ -49,7 +49,7 @@ class Task(ABC):
         return all_ops
 
     @classmethod
-    def lookup(cls, task_type: str) -> Optional['Task']:
+    def lookup(cls, task_type: str) -> Optional[Type['Task']]:
         """
         Yield all subclasses of the given class, per:
         """
@@ -59,7 +59,7 @@ class Task(ABC):
         return None
 
     @classmethod
-    def from_uri(cls, task_uri: str) -> 'Task':
+    def from_uri(cls, task_uri: str, lock: Lock | None) -> 'Task':
         """Create a Task instance from its URI in the triplestore."""
         q = Template(
             get_prefixes_for_query("adms", "task") +
@@ -74,7 +74,7 @@ class Task(ABC):
         for b in query(q, sudo=True).get('results').get('bindings'):
             candidate_cls = cls.lookup(b['taskType']['value'])
             if candidate_cls is not None:
-                return candidate_cls(task_uri)
+                return candidate_cls(task_uri, lock=lock)
             raise RuntimeError(
                 "Unknown task type {0}".format(b['taskType']['value']))
         raise RuntimeError("Task with uri {0} not found".format(task_uri))
