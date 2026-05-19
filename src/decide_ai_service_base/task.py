@@ -4,6 +4,7 @@ import logging
 from abc import ABC, abstractmethod
 from string import Template
 from typing import Optional, Type
+from threading import Lock
 
 from escape_helpers import sparql_escape_uri, sparql_escape_datetime
 from helpers import query, update, log, logger
@@ -14,13 +15,22 @@ from .sparql_config import get_prefixes_for_query, GRAPHS, JOB_STATUSES
 class Task(ABC):
     """Base class for background tasks that process data from the triplestore."""
 
-    def __init__(self, task_uri: str):
+    def __init__(self, task_uri: str, lock: Lock | None = None):
         super().__init__()
         self.task_uri = task_uri
         self.results_container_uris = []
         self.source: Optional[str] = None
         self.start_time: Optional[datetime] = None
         self.end_time: Optional[datetime] = None
+        self.lock = lock or Lock()
+
+    def _acquire_lock(self):
+        if self.lock is not None:
+            self.lock.acquire(blocking=True)
+
+    def _release_lock(self):
+        if self.lock is not None:
+            self.lock.release()
 
     @property
     def duration_in_seconds(self) -> int | None:
@@ -179,8 +189,9 @@ class Task(ABC):
 
     def execute(self):
         """Run the task and handle state transitions."""
-        with self.run():
-            self.process()
+        with self.lock:
+            with self.run():
+                self.process()
 
     @abstractmethod
     def process(self):
