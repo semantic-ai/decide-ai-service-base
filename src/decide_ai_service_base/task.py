@@ -4,7 +4,6 @@ import logging
 from abc import ABC, abstractmethod
 from string import Template
 from typing import Optional, Type
-from threading import Lock
 
 from escape_helpers import sparql_escape_uri, sparql_escape_datetime
 from helpers import query, update, log, logger
@@ -15,22 +14,13 @@ from .sparql_config import get_prefixes_for_query, GRAPHS, JOB_STATUSES
 class Task(ABC):
     """Base class for background tasks that process data from the triplestore."""
 
-    def __init__(self, task_uri: str, lock: Optional[Lock] = None):
+    def __init__(self, task_uri: str):
         super().__init__()
         self.task_uri = task_uri
         self.results_container_uris = []
         self.source: Optional[str] = None
         self.start_time: Optional[datetime] = None
         self.end_time: Optional[datetime] = None
-        self.lock = lock or Lock()
-
-    def _acquire_lock(self):
-        if self.lock is not None:
-            self.lock.acquire(blocking=True)
-
-    def _release_lock(self):
-        if self.lock is not None:
-            self.lock.release()
 
     @property
     def duration_in_seconds(self) -> int | None:
@@ -59,7 +49,7 @@ class Task(ABC):
         return None
 
     @classmethod
-    def from_uri(cls, task_uri: str, lock: Optional[Lock]) -> 'Task':
+    def from_uri(cls, task_uri: str) -> 'Task':
         """Create a Task instance from its URI in the triplestore."""
         q = Template(
             get_prefixes_for_query("adms", "task") +
@@ -74,7 +64,7 @@ class Task(ABC):
         for b in query(q, sudo=True).get('results').get('bindings'):
             candidate_cls = cls.lookup(b['taskType']['value'])
             if candidate_cls is not None:
-                return candidate_cls(task_uri, lock=lock)
+                return candidate_cls(task_uri)
             raise RuntimeError(
                 "Unknown task type {0}".format(b['taskType']['value']))
         raise RuntimeError("Task with uri {0} not found".format(task_uri))
@@ -189,9 +179,8 @@ class Task(ABC):
 
     def execute(self):
         """Run the task and handle state transitions."""
-        with self.lock:
-            with self.run():
-                self.process()
+        with self.run():
+            self.process()
 
     @abstractmethod
     def process(self):
