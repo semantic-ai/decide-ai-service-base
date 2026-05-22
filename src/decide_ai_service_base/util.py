@@ -39,15 +39,16 @@ class TaskProcessor:
 
     def __call__(self):
         logger.info("Checking for open tasks...")
-        uri = get_one_open_task()
-        while uri is not None:
-            logger.info(f"Processing {uri}")
-            try:
-                task = Task.from_uri(uri, lock=self.lock)
-                task.execute()
-            except Exception as e:
-                logger.error(f"Error processing task {uri}: {e}", exc_info=True)
+        with self.lock:
             uri = get_one_open_task()
+            while uri is not None:
+                logger.info(f"Processing {uri}")
+                try:
+                    task = Task.from_uri(uri)
+                    task.execute()
+                except Exception as e:
+                    logger.error(f"Error processing task {uri}: {e}", exc_info=True)
+                uri = get_one_open_task()
 
 
 def process_open_tasks():
