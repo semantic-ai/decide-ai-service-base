@@ -1,5 +1,6 @@
 from pathlib import Path
 from pydantic import ValidationError, BaseModel
+from pydantic_settings import BaseSettings
 from typing import Type, TypeVar
 import json
 import os
@@ -47,12 +48,21 @@ def load_config(application_config_cls: Type[T], config_path: str | Path | None 
             f"Invalid JSON in config file {config_path}: {e}"
         ) from e
 
-    # Validate with Pydantic
     try:
-        _config = application_config_cls.model_validate(config_data)
+        if issubclass(application_config_cls, BaseSettings):
+            # BaseSettings merges env vars on top of the explicitly passed config data
+            # env vars  >  config.json (config_data kwargs)  >  field defaults
+            _config = application_config_cls(**config_data)
+            # Validate with Pydantic
+            _config = application_config_cls.model_validate(config_data)
     except ValidationError as e:
+        errors = e.errors()
+        error_lines = [
+            f"  - {' -> '.join(str(loc) for loc in err['loc'])}: {err['msg']}"
+            for err in errors
+        ]
         raise ValueError(
-            f"Configuration validation failed for {config_path}:\n{e}"
+            f"Configuration validation failed for {config_path}:\n" + "\n".join(error_lines)
         ) from e
 
     return _config
