@@ -33,7 +33,7 @@ def wait_for_triplestore():
 
 
 class TaskProcessor:
-    def __init__(self, lock: Optional[Lock] = None):
+    def __init__(self, lock: Lock):
         super().__init__()
         self.lock = lock
 
@@ -51,8 +51,8 @@ class TaskProcessor:
                 uri = get_one_open_task()
 
 
-def process_open_tasks():
-    processor = TaskProcessor()
+def process_open_tasks(lock: Lock):
+    processor = TaskProcessor(lock)
     processor()
 
 
