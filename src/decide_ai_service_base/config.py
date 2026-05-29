@@ -1,6 +1,8 @@
 from pathlib import Path
 from pydantic import ValidationError, BaseModel
+from pydantic_settings import BaseSettings
 from typing import Type, TypeVar
+from helpers import logger
 import json
 import os
 
@@ -48,6 +50,12 @@ def load_config(application_config_cls: Type[T], config_path: str | Path | None 
         ) from e
 
     # Validate with Pydantic
+    if not issubclass(application_config_cls, BaseModel):
+        raise ValidationError("No pydantic BaseModel class loaded")
+
+    if issubclass(application_config_cls, BaseModel) and not issubclass(application_config_cls, BaseSettings):
+        logger.warning("BaseModel passed instead of BaseSettings, environment variables will be ignored.")
+
     try:
         _config = application_config_cls.model_validate(config_data)
     except ValidationError as e:

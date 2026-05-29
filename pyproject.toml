@@ -5,5 +5,6 @@ description = "Base package for implementing AI services in the template for the
 requires-python = ">=3.12"
 dependencies = [
     "pydantic>=2.12.5",
+    "pydantic-settings>=2.0.0",
 ]
 readme = "README.md"
