@@ -1,13 +1,15 @@
 from pathlib import Path
-from pydantic import ValidationError, BaseModel
+from pydantic import BaseModel
+from pydantic_settings import BaseSettings
 from typing import Type, TypeVar
+from helpers import logger
 import json
 import os
 
 T = TypeVar('T', bound=BaseModel)
 
 
-def load_config(application_config_cls: Type[T], config_path: str | Path | None = None) -> T:
+def load_config(application_config_cls: Type[T], config_path: str | Path | None = None) -> T | None:
     """
     Load and validate configuration from config.json.
 
@@ -35,7 +37,7 @@ def load_config(application_config_cls: Type[T], config_path: str | Path | None 
     if not config_path.exists():
         raise FileNotFoundError(
             f"Configuration file not found at {config_path}. "
-            f"Please create config.json at the project root."
+            f"Please create  at the project root."
         )
 
     # Read and parse JSON
@@ -47,12 +49,9 @@ def load_config(application_config_cls: Type[T], config_path: str | Path | None 
             f"Invalid JSON in config file {config_path}: {e}"
         ) from e
 
-    # Validate with Pydantic
-    try:
-        _config = application_config_cls.model_validate(config_data)
-    except ValidationError as e:
-        raise ValueError(
-            f"Configuration validation failed for {config_path}:\n{e}"
-        ) from e
+    if issubclass(application_config_cls, BaseModel) and not issubclass(application_config_cls, BaseSettings):
+        logger.warning("Config not derived from pydantic-settings BaseSettings, environment variables will not be used.")
+    if issubclass(application_config_cls, BaseModel):
+        return application_config_cls(**config_data)
 
-    return _config
+    raise ValueError("Provided config class is not a pydantic model")
