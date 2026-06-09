@@ -145,19 +145,19 @@ AI_COMPONENTS = {
     "impact_annotator": "http://lblod.data.gift/id/components/impact-assessment/v1.0.0",
 
     #Named entity recognition (the geocoding-service)
-    "ner_extractor": "http://data.gift/id/components/entity-extraction/v1.0.0",
-    "translator": "http://data.gift/id/components/translation/v1.0.0",
-    "segmenter": "http://data.gift/id/components/segmentation/v1.0.0",
+    "ner_extractor": "http://lblod.data.gift/id/components/entity-extraction/v1.0.0",
+    "translator": "http://lblod.data.gift/id/components/translation/v1.0.0",
+    "segmenter": "http://lblod.data.gift/id/components/segmentation/v1.0.0",
     "codelist_trainer": "http://lblod.data.gift/id/components/codelist-training/v1.0.0", #unused
 
     #Named entity linking (doesnt use base-service, but for consistency)
-    "linker": "http://data.gift/id/components/named-entity-linking/v1.0.0",
+    "linker": "http://lblod.data.gift/id/components/named-entity-linking/v1.0.0",
     
     #PDF scraping and content extraction
     "content_extraction": "http://lblod.data.gift/id/components/pdf-to-eli/v1.0.0",
 
     #other
-    "decide_system": "http://data.lblod.info/id/ai-components/DECIDe",
+    "decide_system": "http://lblod.data.gift/id/ai-components/DECIDe",
     
     
 }
