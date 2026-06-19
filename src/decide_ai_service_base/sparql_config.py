@@ -56,7 +56,8 @@ SPARQL_PREFIXES = {
     "linguistics_translations": "http://purl.org/linguistics/gold/translation",
     "text_position_selectors": "http://data.lblod.info/id/text-position-selectors/",
     "statements": "http://data.lblod.info/id/statements/",
-    "specific_resources": "http://data.lblod.info/id/specific-resources/"
+    "specific_resources": "http://data.lblod.info/id/specific-resources/",
+    "tcs": "https://w3id.org/tcs#"
 }
 
 # ==============================================================================
@@ -163,6 +164,15 @@ ONTOLOGY_CLASSES = {
     "ai_developer": "https://w3id.org/airo#AIDeveloper",
     "ai_component": "https://data.vlaanderen.be/ns/lblod#AIComponent",
 }
+
+# ==============================================================================
+# AGENT VERSIONING
+# ==============================================================================
+
+CONFIGURED_AGENT_URI = os.getenv("CONFIGURED_AGENT_URI", "http://lblod.data.gift/id/components/unknown")
+CONFIG_REPO_URL = os.getenv("CONFIG_REPO_URL")
+FORCE_VERSIONED_AGENT_URI = os.getenv('FORCE_VERSIONED_AGENT_URI')
+
 
 # ==============================================================================
 # HELPER FUNCTIONS
