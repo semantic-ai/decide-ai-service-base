@@ -133,34 +133,6 @@ AGENT_TYPES = {
     "ai_component": "https://data.vlaanderen.be/ns/lblod#AIComponent",
 }
 
-# ==============================================================================
-# AI COMPONENT URIs
-# ==============================================================================
-
-AI_COMPONENTS = {
-
-    #codelist-matching-service
-    "classifier_annotater": "http://lblod.data.gift/id/components/codelist-classification/v1.0.0",
-    "model_annotater": "http://lblod.data.gift/id/components/codelist-annotation/v1.0.0",
-    "impact_annotator": "http://lblod.data.gift/id/components/impact-assessment/v1.0.0",
-
-    #Named entity recognition (the geocoding-service)
-    "ner_extractor": "http://lblod.data.gift/id/components/entity-extraction/v1.0.0",
-    "translator": "http://lblod.data.gift/id/components/translation/v1.0.0",
-    "segmenter": "http://lblod.data.gift/id/components/segmentation/v1.0.0",
-    "codelist_trainer": "http://lblod.data.gift/id/components/codelist-training/v1.0.0", #unused
-
-    #Named entity linking (doesnt use base-service, but for consistency)
-    "linker": "http://lblod.data.gift/id/components/named-entity-linking/v1.0.0",
-    
-    #PDF scraping and content extraction
-    "content_extraction": "http://lblod.data.gift/id/components/pdf-to-eli/v1.0.0",
-
-    #other
-    "decide_system": "http://lblod.data.gift/id/ai-components/DECIDe",
-    
-    
-}
 
 # ==============================================================================
 # LANGUAGE MAPPINGS
