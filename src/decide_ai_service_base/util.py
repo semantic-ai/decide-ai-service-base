@@ -1,4 +1,5 @@
 import datetime
+import re
 import time
 from string import Template
 from threading import Lock
@@ -7,7 +8,7 @@ from typing import Optional
 from escape_helpers import sparql_escape_uri, sparql_escape_string
 from helpers import query, log, update, logger
 
-from .sparql_config import get_prefixes_for_query, GRAPHS, JOB_STATUSES, prefixed_log
+from .sparql_config import CONFIG_REPO_URL, CONFIGURED_AGENT_URI, FORCE_VERSIONED_AGENT_URI, get_prefixes_for_query, GRAPHS, JOB_STATUSES, prefixed_log
 from .task import Task
 
 
@@ -177,3 +178,59 @@ def start_and_end_to_xsd_duration(start: datetime, end: datetime) -> str:
     ])
 
     return f"{sign}P{date_part}" + (f"T{time_part}" if time_part else "T0S")
+
+# suffix in case there are multiple agents in this one service, ideally one service = one agent
+def get_agent_uri(agent_suffix:str = ""):
+    agent_uri = CONFIGURED_AGENT_URI
+        
+    if agent_suffix:
+        separator = "" if agent_suffix.startswith("/") or agent_suffix.startswith("#") else "/"
+        agent_uri += separator + agent_suffix 
+    return agent_uri
+
+def write_agent_info(service_base: str, agent_suffix:str = ""):
+    if FORCE_VERSIONED_AGENT_URI == "true" :
+        # if CONFIG_REPO_URL not set or if /commit/ or /tree/ not in CONFIG_REPO_URL, error
+        if not CONFIG_REPO_URL or not re.search(r'/commit/|/tree/', CONFIG_REPO_URL) or not re.search(r'/commit/|/tree/', CONFIGURED_AGENT_URI):
+            raise ValueError(f"FORCE_VERSIONED_AGENT_URI is set to true, but CONFIG_REPO_URL or CONFIGURED_AGENT_URI is not properly set to a commit or tree URL.\nCONFIG_REPO_URL: {CONFIG_REPO_URL}\nCONFIGURED_AGENT_URI: {CONFIGURED_AGENT_URI}")        
+
+    agent_uri = get_agent_uri(agent_suffix)
+    separator = ""
+    if agent_suffix and not (agent_suffix.startswith("/") or agent_suffix.startswith("#")):
+        separator = "/"
+
+    repo_triples = ""
+    if CONFIG_REPO_URL:
+        # take everything before the /tree/ or /commit/ part of the url and put it in repo
+        match = re.search(r'^(.*?)(?:/commit/|/tree/)', CONFIG_REPO_URL)
+        repo = match.group(1) if match else CONFIG_REPO_URL
+        repo_triples = Template(
+        """
+        $configuration_uri schema:url $config_repo_url .
+        $configuration_uri schema:codeRepository $repo .
+        """
+        ).substitute(
+            configuration_uri=sparql_escape_uri(agent_uri),
+            config_repo_url=sparql_escape_uri(CONFIG_REPO_URL),
+            repo=sparql_escape_uri(repo)
+        )
+
+    q = Template(
+        get_prefixes_for_query("foaf", "ext", "schema", "tcs", "prov") +
+        """
+        INSERT DATA {
+            GRAPH $graph {
+                $configuration_uri a tcs:InstancePipelineComponent, foaf:Agent ;
+                    prov:specializationOf $service_base .
+                $repo_triples
+            }
+        }
+        """
+    ).substitute(
+        graph=sparql_escape_uri(GRAPHS["jobs"]),
+        configuration_uri=sparql_escape_uri(agent_uri),
+        service_base=sparql_escape_uri(service_base+separator+agent_suffix),
+        repo_triples=repo_triples
+    )
+
+    update(q, sudo=True)
