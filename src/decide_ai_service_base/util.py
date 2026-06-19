@@ -184,7 +184,8 @@ def get_agent_uri(agent_suffix:str = ""):
     agent_uri = CONFIGURED_AGENT_URI
         
     if agent_suffix:
-        agent_uri += agent_suffix
+        separator = "" if agent_suffix.startswith("/") or agent_suffix.startswith("#") else "/"
+        agent_uri += separator + agent_suffix 
     return agent_uri
 
 def write_agent_info(service_base: str, agent_suffix:str = ""):
@@ -194,6 +195,9 @@ def write_agent_info(service_base: str, agent_suffix:str = ""):
             raise ValueError(f"FORCE_VERSIONED_AGENT_URI is set to true, but CONFIG_REPO_URL or CONFIGURED_AGENT_URI is not properly set to a commit or tree URL.\nCONFIG_REPO_URL: {CONFIG_REPO_URL}\nCONFIGURED_AGENT_URI: {CONFIGURED_AGENT_URI}")        
 
     agent_uri = get_agent_uri(agent_suffix)
+    separator = ""
+    if agent_suffix and not (agent_suffix.startswith("/") or agent_suffix.startswith("#")):
+        separator = "/"
 
     repo_triples = ""
     if CONFIG_REPO_URL:
@@ -225,7 +229,7 @@ def write_agent_info(service_base: str, agent_suffix:str = ""):
     ).substitute(
         graph=sparql_escape_uri(GRAPHS["jobs"]),
         configuration_uri=sparql_escape_uri(agent_uri),
-        service_base=sparql_escape_uri(service_base),
+        service_base=sparql_escape_uri(service_base+separator+agent_suffix),
         repo_triples=repo_triples
     )
 
