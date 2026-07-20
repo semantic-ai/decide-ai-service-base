@@ -1,6 +1,9 @@
+from fastapi import FastAPI
+import builtins
 import datetime
 import re
 import time
+import yaml
 from string import Template
 from threading import Lock
 from typing import Optional
@@ -8,10 +11,15 @@ from typing import Optional
 from escape_helpers import sparql_escape_uri, sparql_escape_string
 from helpers import query, log, update, logger
 
-from .sparql_config import CONFIG_REPO_URL, CONFIGURED_AGENT_URI, FORCE_VERSIONED_AGENT_URI, get_prefixes_for_query, GRAPHS, JOB_STATUSES, prefixed_log
+from .sparql_config import CONFIG_REPO_URL, COMPOSE_FILE, COMPOSE_SERVICE, BASE_AGENT_URI, FORCE_VERSIONED_AGENT_URI, get_prefixes_for_query, GRAPHS, JOB_STATUSES, prefixed_log
 from .task import Task
+import os
+import json
+from pathlib import Path
 
-
+app: FastAPI = getattr(builtins, "app", FastAPI())
+app.state.agent_uri = None
+    
 def wait_for_triplestore():
     triplestore_live = False
     log("Waiting for triplestore...")
@@ -181,19 +189,100 @@ def start_and_end_to_xsd_duration(start: datetime, end: datetime) -> str:
 
 # suffix in case there are multiple agents in this one service, ideally one service = one agent
 def get_agent_uri(agent_suffix:str = ""):
-    agent_uri = CONFIGURED_AGENT_URI
+    if app.state.agent_uri:
+        return app.state.agent_uri + agent_suffix
+
+    config_as_string = fetch_config()
+    existing_agent_uri = get_existing_config_uri(config_as_string)
+
+    if existing_agent_uri:
+        app.state.agent_uri = existing_agent_uri
+        return existing_agent_uri + agent_suffix
+    
+    import uuid
+    agent_id = str(uuid.uuid4())
+    agent_uri = BASE_AGENT_URI + "/"+ agent_id
+
+    store_config_uri(agent_uri, config_as_string)
         
-    if agent_suffix:
-        separator = "" if agent_suffix.startswith("/") or agent_suffix.startswith("#") else "/"
-        agent_uri += separator + agent_suffix 
-    return agent_uri
+    app.state.agent_uri = agent_uri
+    return agent_uri + agent_suffix
+
+def get_existing_config_uri(config_as_string):
+    q = Template(
+        get_prefixes_for_query("foaf", "ext", "schema", "tcs", "prov") +
+        """
+        SELECT ?agent_uri WHERE {
+            ?agent_uri a ext:AgentConfig ;
+                        ext:agentConfig $config_as_string .
+        }
+        """
+    ).substitute(
+        config_as_string=sparql_escape_string(config_as_string),
+    )
+
+    res = query(q, sudo=True)
+    return res["results"]["bindings"][0]["agent_uri"]["value"] if res["results"]["bindings"] else None
+
+def store_config_uri(config_uri, config_as_string):
+    q = Template(
+        get_prefixes_for_query("foaf", "ext", "schema", "tcs", "prov") +
+        """
+        INSERT DATA {
+            GRAPH $graph {
+                ?configuration_uri a ext:AgentConfig ;
+                        ext:agentConfig $config_as_string .
+            }
+        }
+        """
+    ).substitute(
+        graph=sparql_escape_uri(GRAPHS["jobs"]),
+        configuration_uri=sparql_escape_uri(config_uri),
+        config_as_string=sparql_escape_string(config_as_string),
+    )
+
+    update(q, sudo=True)
+
+def fetch_config():
+    """
+    Recursively concatenate the COMPOSE_FILE with the files in the /config directory with their file paths.
+    """
+    compose = {}
+    with open(COMPOSE_FILE) as compose_file:
+        raw_compose = yaml.safe_load(compose_file)
+        compose = raw_compose["services"][COMPOSE_SERVICE]
+
+    mounts = {}
+    for volume in compose['volumes']:
+        mount_point = volume.split(":")[1]
+
+        if mount_point in ["/app", COMPOSE_FILE]:
+            # safety: ignore /app path in case we're in dev mode, don't include the whole source
+            # also ignore compose file, we only need the service part of it
+            continue
+
+        if Path(mount_point).is_file():
+            track_file_content(mounts, mount_point)
+        else:
+            for root, _, files in os.walk(mount_point):
+                for file in files:
+                    track_file_content(mounts, file, root)
+
+    return json.dumps({"compose": compose, "config": mounts}, sort_keys=True, indent=2)
+
+def track_file_content(mounts, file, root="/"):
+    file_path = Path(root) / file
+    absolute_path = str(file_path)
+
+    # Read the JSON file
+    with open(file_path, "r", encoding="utf-8") as f:
+        try:
+            content = f.read()
+            mounts[absolute_path] = content
+        except json.JSONDecodeError as e:
+            print(f"Error reading {file_path}: {e}")
 
 def write_agent_info(service_base: str, agent_suffix:str = ""):
-    if FORCE_VERSIONED_AGENT_URI == "true" :
-        # if CONFIG_REPO_URL not set or if /commit/ or /tree/ not in CONFIG_REPO_URL, error
-        if not CONFIG_REPO_URL or not re.search(r'/commit/|/tree/', CONFIG_REPO_URL) or not re.search(r'/commit/|/tree/', CONFIGURED_AGENT_URI):
-            raise ValueError(f"FORCE_VERSIONED_AGENT_URI is set to true, but CONFIG_REPO_URL or CONFIGURED_AGENT_URI is not properly set to a commit or tree URL.\nCONFIG_REPO_URL: {CONFIG_REPO_URL}\nCONFIGURED_AGENT_URI: {CONFIGURED_AGENT_URI}")        
-
     agent_uri = get_agent_uri(agent_suffix)
     separator = ""
     if agent_suffix and not (agent_suffix.startswith("/") or agent_suffix.startswith("#")):

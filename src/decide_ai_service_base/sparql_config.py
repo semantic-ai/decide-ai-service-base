@@ -169,9 +169,11 @@ ONTOLOGY_CLASSES = {
 # AGENT VERSIONING
 # ==============================================================================
 
-CONFIGURED_AGENT_URI = os.getenv("CONFIGURED_AGENT_URI", "http://lblod.data.gift/id/components/unknown")
+BASE_AGENT_URI = os.getenv("BASE_AGENT_URI", "http://lblod.data.gift/id/components/")
 CONFIG_REPO_URL = os.getenv("CONFIG_REPO_URL")
 FORCE_VERSIONED_AGENT_URI = os.getenv('FORCE_VERSIONED_AGENT_URI')
+COMPOSE_FILE = os.getenv("COMPOSE_FILE", "docker-compose.yaml")
+COMPOSE_SERVICE = os.getenv("COMPOSE_SERVICE", "ai")
 
 
 # ==============================================================================
