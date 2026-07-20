@@ -1,24 +1,32 @@
-from fastapi import FastAPI
 import builtins
 import datetime
+import hashlib
+import json
+import os
 import re
 import time
-import yaml
+import uuid
+from pathlib import Path
 from string import Template
 from threading import Lock
 from typing import Optional
 
-from escape_helpers import sparql_escape_uri, sparql_escape_string
-from helpers import query, log, update, logger
+import yaml
+from escape_helpers import sparql_escape_string, sparql_escape_uri
+from fastapi import FastAPI
+from helpers import log, logger, query, update
 
-from .sparql_config import CONFIG_REPO_URL, COMPOSE_FILE, COMPOSE_SERVICE, BASE_AGENT_URI, FORCE_VERSIONED_AGENT_URI, get_prefixes_for_query, GRAPHS, JOB_STATUSES, prefixed_log
+from .sparql_config import (BASE_AGENT_URI, BASE_CONFIG_URI, COMPOSE_FILE,
+                            COMPOSE_SERVICE, IGNORE_MOUNT_REGEX,
+                            GRAPHS, JOB_STATUSES,
+                            get_prefixes_for_query, prefixed_log)
 from .task import Task
-import os
-import json
-from pathlib import Path
 
 app: FastAPI = getattr(builtins, "app", FastAPI())
-app.state.agent_uri = None
+# note only threadsafe during startup and for reading during service operation
+# should be fine as you should register agent_uris during startup
+app.state.agent_uris = {}
+app.state.config_uri = None
     
 def wait_for_triplestore():
     triplestore_live = False
@@ -135,7 +143,6 @@ def fail_busy_and_scheduled_tasks():
     update(q, sudo=True)
 
 def write_error_log(task_uri, error_message):
-    import uuid
     container_id = str(uuid.uuid4())
     container_uri = f"http://data.lblod.info/id/data-container/{container_id}"
     error_uuid = str(uuid.uuid4())
@@ -189,56 +196,105 @@ def start_and_end_to_xsd_duration(start: datetime, end: datetime) -> str:
 
 # suffix in case there are multiple agents in this one service, ideally one service = one agent
 def get_agent_uri(agent_suffix:str = ""):
-    if app.state.agent_uri:
-        return app.state.agent_uri + agent_suffix
+    agent_uri = app.state.agent_uris.get(agent_suffix, None)
+    if not agent_uri:
+        raise ValueError("Requested agent uri, but the agent was not registered. Call write_agent_info at startup.")
+    return agent_uri
 
-    config_as_string = fetch_config()
-    existing_agent_uri = get_existing_config_uri(config_as_string)
+def ensure_config_uri():
+    if app.state.config_uri:
+        return app.state.config_uri
 
-    if existing_agent_uri:
-        app.state.agent_uri = existing_agent_uri
-        return existing_agent_uri + agent_suffix
+    config = fetch_config()
+    config_as_string = json.dumps(config, sort_keys=True, indent=2)
+    sha256 = hashlib.sha256()
+    sha256.update(config_as_string.encode())
     
-    import uuid
-    agent_id = str(uuid.uuid4())
-    agent_uri = BASE_AGENT_URI + "/"+ agent_id
+    hashed_config = sha256.hexdigest()
 
-    store_config_uri(agent_uri, config_as_string)
+    existing_config_uri = get_existing_config_uri(hashed_config)
+
+    if existing_config_uri:
+        app.state.config_uri = existing_config_uri
+        return existing_config_uri
+    
+    config_id = str(uuid.uuid4())
+    config_uri = BASE_CONFIG_URI + config_id
+
+    store_config_uri(config_uri, config_id, config, hashed_config)
         
-    app.state.agent_uri = agent_uri
-    return agent_uri + agent_suffix
+    app.state.config_uri = config_uri
+    return config_uri
 
-def get_existing_config_uri(config_as_string):
+def get_existing_config_uri(hashed_config):
     q = Template(
-        get_prefixes_for_query("foaf", "ext", "schema", "tcs", "prov") +
+        get_prefixes_for_query("ext") +
         """
-        SELECT ?agent_uri WHERE {
-            ?agent_uri a ext:AgentConfig ;
-                        ext:agentConfig $config_as_string .
+        SELECT ?agent_config WHERE {
+            ?agent_config a ext:AgentConfig ;
+                        ext:configHash $hashed_config .
         }
         """
     ).substitute(
-        config_as_string=sparql_escape_string(config_as_string),
+        hashed_config=sparql_escape_string(hashed_config),
     )
 
     res = query(q, sudo=True)
-    return res["results"]["bindings"][0]["agent_uri"]["value"] if res["results"]["bindings"] else None
+    return res["results"]["bindings"][0]["agent_config"]["value"] if res["results"]["bindings"] else None
 
-def store_config_uri(config_uri, config_as_string):
+def store_config_uri(config_uri, config_id, config, hashed_config):
     q = Template(
-        get_prefixes_for_query("foaf", "ext", "schema", "tcs", "prov") +
+        get_prefixes_for_query("ext", "mu") +
         """
         INSERT DATA {
             GRAPH $graph {
-                ?configuration_uri a ext:AgentConfig ;
-                        ext:agentConfig $config_as_string .
+                $configuration_uri a ext:AgentConfig ;
+                        mu:uuid $config_id ;
+                        ext:configHash $config_hash .
             }
         }
         """
     ).substitute(
         graph=sparql_escape_uri(GRAPHS["jobs"]),
         configuration_uri=sparql_escape_uri(config_uri),
-        config_as_string=sparql_escape_string(config_as_string),
+        config_id=sparql_escape_string(config_id),
+        config_hash=sparql_escape_string(hashed_config),
+    )
+
+    for key,value in config["config"].items():
+        store_config_part(config_uri, value, key)
+    
+    compose = json.dumps(config["compose"], sort_keys=True, indent=2)
+    store_config_part(config_uri, compose,"docker-compose.yml:service")
+
+    update(q, sudo=True)
+
+def store_config_part(config_uri, config, path):
+    part_id = str(uuid.uuid4())
+    part_uri = BASE_CONFIG_URI + "part/" + part_id;
+
+
+    q = Template(
+        get_prefixes_for_query("mu", "ext") +
+        """
+        INSERT DATA {
+            GRAPH $graph {
+                $configuration_uri ext:hasConfigFile $part_uri .
+                
+                $part_uri a ext:ConfigPart ;
+                          mu:uuid $part_id ;
+                          ext:configPath $config_path ;
+                          ext:configText $config_as_string .
+            }
+        }
+        """
+    ).substitute(
+        graph=sparql_escape_uri(GRAPHS["jobs"]),
+        part_uri=sparql_escape_uri(part_uri),
+        part_id=sparql_escape_string(part_id),
+        configuration_uri=sparql_escape_uri(config_uri),
+        config_path=sparql_escape_string(path),
+        config_as_string=sparql_escape_string(config),
     )
 
     update(q, sudo=True)
@@ -255,9 +311,9 @@ def fetch_config():
     mounts = {}
     for volume in compose['volumes']:
         mount_point = volume.split(":")[1]
-
-        if mount_point in ["/app", COMPOSE_FILE]:
-            # safety: ignore /app path in case we're in dev mode, don't include the whole source
+        
+        if mount_point == COMPOSE_FILE or re.search(IGNORE_MOUNT_REGEX, mount_point):
+            # safety: ignore /app and /data 
             # also ignore compose file, we only need the service part of it
             continue
 
@@ -268,7 +324,7 @@ def fetch_config():
                 for file in files:
                     track_file_content(mounts, file, root)
 
-    return json.dumps({"compose": compose, "config": mounts}, sort_keys=True, indent=2)
+    return {"compose": compose, "config": mounts}
 
 def track_file_content(mounts, file, root="/"):
     file_path = Path(root) / file
@@ -283,43 +339,66 @@ def track_file_content(mounts, file, root="/"):
             print(f"Error reading {file_path}: {e}")
 
 def write_agent_info(service_base: str, agent_suffix:str = ""):
-    agent_uri = get_agent_uri(agent_suffix)
+    agent_config_uri = ensure_config_uri()
+
+    agent_uri = ensure_agent_uri(agent_config_uri, service_base, agent_suffix)
+
+    app.state.agent_uris[agent_suffix] = agent_uri
+    
+
+def ensure_agent_uri(agent_config_uri, service_base, agent_suffix):
     separator = ""
     if agent_suffix and not (agent_suffix.startswith("/") or agent_suffix.startswith("#")):
         separator = "/"
 
-    repo_triples = ""
-    if CONFIG_REPO_URL:
-        # take everything before the /tree/ or /commit/ part of the url and put it in repo
-        match = re.search(r'^(.*?)(?:/commit/|/tree/)', CONFIG_REPO_URL)
-        repo = match.group(1) if match else CONFIG_REPO_URL
-        repo_triples = Template(
-        """
-        $configuration_uri schema:url $config_repo_url .
-        $configuration_uri schema:codeRepository $repo .
-        """
-        ).substitute(
-            configuration_uri=sparql_escape_uri(agent_uri),
-            config_repo_url=sparql_escape_uri(CONFIG_REPO_URL),
-            repo=sparql_escape_uri(repo)
-        )
-
+    service_base=f"{service_base}{separator}{agent_suffix}"
     q = Template(
         get_prefixes_for_query("foaf", "ext", "schema", "tcs", "prov") +
         """
+        SELECT ?agent_uri {
+            GRAPH $graph {
+                ?agent_uri a tcs:InstancePipelineComponent, foaf:Agent ;
+                    prov:specializationOf $service_base ;
+                    ext:hasConfig $agent_config_uri .
+            }
+        } LIMIT 1
+        """
+    ).substitute(
+        graph=sparql_escape_uri(GRAPHS["jobs"]),
+        agent_config_uri=sparql_escape_uri(agent_config_uri),
+        service_base=sparql_escape_uri(service_base)
+    )
+
+    result = query(q, sudo=True)
+
+    agent_uri = result["results"]["bindings"][0]["agent_uri"]["value"] if result["results"]["bindings"] else None
+
+    if agent_uri:
+        return agent_uri    
+
+    agent_id = str(uuid.uuid4())
+    agent_uri = BASE_AGENT_URI + agent_id + separator + agent_suffix
+    
+    q = Template(
+        get_prefixes_for_query("foaf", "ext", "schema", "tcs", "prov", "mu") +
+        """
         INSERT DATA {
             GRAPH $graph {
-                $configuration_uri a tcs:InstancePipelineComponent, foaf:Agent ;
-                    prov:specializationOf $service_base .
-                $repo_triples
+                $agent_uri a tcs:InstancePipelineComponent, foaf:Agent ;
+                    mu:uuid $agent_id ;
+                    prov:specializationOf $service_base ;
+                    ext:hasConfig $agent_config_uri .
             }
         }
         """
     ).substitute(
         graph=sparql_escape_uri(GRAPHS["jobs"]),
-        configuration_uri=sparql_escape_uri(agent_uri),
-        service_base=sparql_escape_uri(service_base+separator+agent_suffix),
-        repo_triples=repo_triples
+        agent_config_uri=sparql_escape_uri(agent_config_uri),
+        service_base=sparql_escape_uri(service_base),
+        agent_id=sparql_escape_string(agent_id),
+        agent_uri=sparql_escape_uri(agent_uri)
     )
 
     update(q, sudo=True)
+
+    return agent_uri
