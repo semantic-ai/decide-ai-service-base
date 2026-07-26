@@ -304,12 +304,15 @@ def fetch_config():
     Recursively concatenate the COMPOSE_FILE with the files in the /config directory with their file paths.
     """
     compose = {}
-    with open(COMPOSE_FILE) as compose_file:
-        raw_compose = yaml.safe_load(compose_file)
-        compose = raw_compose["services"][COMPOSE_SERVICE]
+    try:
+        with open(COMPOSE_FILE) as compose_file:
+            raw_compose = yaml.safe_load(compose_file)
+            compose = raw_compose["services"][COMPOSE_SERVICE]
+    except:
+        raise ValueError(f"Could not find valid compose file at {COMPOSE_FILE} with service {COMPOSE_SERVICE}. A compose file with a service is necessary to find the image version and configuration of the ai system used")
 
     mounts = {}
-    for volume in compose['volumes']:
+    for volume in compose.get('volumes', []):
         mount_point = volume.split(":")[1]
         
         if mount_point == COMPOSE_FILE or re.search(IGNORE_MOUNT_REGEX, mount_point):
