@@ -132,7 +132,7 @@ class NERAnnotation(Annotation):
             extra=self.get_extra_inserts(),
             selector_part=selector_part,
             selector_filter=selector_filter,
-            graph=GRAPHS['ai']
+            graph=sparql_escape_uri(GRAPHS['ai'])
         )
 
         try:

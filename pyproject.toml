@@ -8,5 +8,21 @@ dependencies = [
     "fastapi==0.121.1",
     "PyYAML==6.0.3",
     "pydantic-settings>=2.0.0",
+    "requests",
 ]
 readme = "README.md"
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+    "pytest-mock>=3.0",
+    "freezegun>=1.0",
+    "httpx>=0.24",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
