@@ -1,14 +1,16 @@
 import contextlib
+import time
+import uuid
 from datetime import datetime, timezone
 import logging
 from abc import ABC, abstractmethod
 from string import Template
 from typing import Optional, Type
 
-from escape_helpers import sparql_escape_uri, sparql_escape_datetime
+from escape_helpers import sparql_escape_uri, sparql_escape_datetime, sparql_escape_string, sparql_escape_int, sparql_escape_float
 from helpers import query, update, log, logger
 
-from .sparql_config import get_prefixes_for_query, GRAPHS, JOB_STATUSES
+from .sparql_config import get_prefixes_for_query, GRAPHS, JOB_STATUSES, AI_CALL_BASE_URI
 
 
 class Task(ABC):
@@ -279,6 +281,79 @@ class Task(ABC):
             source_text = self.fetch_expression_data(source_uri)
 
         return source_uri, source_text
+
+    def record_ai_call(
+            self,
+            endpoint: str,
+            model_uri: str,
+            tokens_in: int,
+            tokens_out: int,
+            duration: Optional[float] = None,
+            cost: Optional[float] = None,
+    ) -> str:
+        call_id = str(uuid.uuid4())
+        call_uri = AI_CALL_BASE_URI + call_id
+
+        duration_triple = f"               ext:duration {sparql_escape_float(duration)} ." if duration is not None else ""
+        cost_triple = f"               ext:cost {sparql_escape_float(cost)} ." if cost is not None else ""
+
+        q = Template(
+            get_prefixes_for_query("mu", "ext", "xsd") +
+            """
+            INSERT DATA {
+                GRAPH $graph {
+                    $task ext:performedAICall $call_uri .
+                    $call_uri a ext:AICall ;
+                              mu:uuid $call_id ;
+                              ext:endpoint $endpoint ;
+                              ext:aiModel $model_uri ;
+                              ext:tokenIn $tokens_in ;
+                              ext:tokenOut $tokens_out
+                              $duration_triple
+                              $cost_triple
+                }
+            }
+            """
+        ).substitute(
+            graph=sparql_escape_uri(GRAPHS["jobs"]),
+            task=sparql_escape_uri(self.task_uri),
+            call_uri=sparql_escape_uri(call_uri),
+            call_id=sparql_escape_string(call_id),
+            endpoint=sparql_escape_string(endpoint),
+            model_uri=sparql_escape_uri(model_uri),
+            tokens_in=sparql_escape_int(tokens_in),
+            tokens_out=sparql_escape_int(tokens_out),
+            duration_triple=duration_triple,
+            cost_triple=cost_triple,
+        )
+
+        update(q, sudo=True)
+        return call_uri
+
+    @contextlib.contextmanager
+    def record_ai_call_cm(
+            self,
+            endpoint: str,
+            model_uri: str,
+            tokens_in: int,
+            tokens_out: int,
+    ):
+        from .pricing import calculate_cost
+
+        start = time.monotonic()
+        try:
+            yield
+        finally:
+            elapsed = time.monotonic() - start
+            cost = calculate_cost(model_uri, tokens_in, tokens_out)
+            self.record_ai_call(
+                endpoint=endpoint,
+                model_uri=model_uri,
+                tokens_in=tokens_in,
+                tokens_out=tokens_out,
+                duration=elapsed,
+                cost=cost,
+            )
 
 
 class DecisionTask(Task, ABC):

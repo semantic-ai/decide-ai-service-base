@@ -57,7 +57,8 @@ SPARQL_PREFIXES = {
     "text_position_selectors": "http://data.lblod.info/id/text-position-selectors/",
     "statements": "http://data.lblod.info/id/statements/",
     "specific_resources": "http://data.lblod.info/id/specific-resources/",
-    "tcs": "https://w3id.org/tcs#"
+    "tcs": "https://w3id.org/tcs#",
+    "ai-call": "http://data.lblod.info/id/ai-call/"
 }
 
 # ==============================================================================
@@ -83,6 +84,12 @@ GRAPHS = {
     "ai": os.getenv('AI_GRAPH', "http://mu.semte.ch/graphs/ai"),
 
 }
+
+# ==============================================================================
+# AI CALL URI
+# ==============================================================================
+
+AI_CALL_BASE_URI = "http://data.lblod.info/id/ai-call/"
 
 # ==============================================================================
 # ORGANIZATION & AGENT URIs
