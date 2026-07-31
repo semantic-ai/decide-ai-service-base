@@ -294,8 +294,8 @@ class Task(ABC):
         call_id = str(uuid.uuid4())
         call_uri = AI_CALL_BASE_URI + call_id
 
-        duration_triple = f"               ext:duration {sparql_escape_float(duration)} ." if duration is not None else ""
-        cost_triple = f"               ext:cost {sparql_escape_float(cost)} ." if cost is not None else ""
+        duration_triple = f"ext:duration {sparql_escape_float(duration)} ;" if duration is not None else ""
+        cost_triple = f"ext:cost {sparql_escape_float(cost)} ;" if cost is not None else ""
 
         q = Template(
             get_prefixes_for_query("mu", "ext", "xsd") +
@@ -307,10 +307,10 @@ class Task(ABC):
                               mu:uuid $call_id ;
                               ext:endpoint $endpoint ;
                               ext:aiModel $model_uri ;
-                              ext:tokenIn $tokens_in ;
-                              ext:tokenOut $tokens_out
                               $duration_triple
                               $cost_triple
+                              ext:tokenIn $tokens_in ;
+                              ext:tokenOut $tokens_out .                    
                 }
             }
             """
