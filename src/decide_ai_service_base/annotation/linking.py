@@ -85,8 +85,10 @@ class LinkingAnnotation(Annotation):
                                  oa:hasTarget $uri .
               }
             } WHERE {
-              GRAPH $graph {
-                  FILTER NOT EXISTS { 
+              $activity_id dct:isPartOf / ext:codelist ?codelist .
+              FILTER NOT EXISTS {
+                  GRAPH $graph
+                   { 
                     ?existingAnn a oa:Annotation ;
                         oa:hasBody $clz ;
                         oa:motivatedBy oa:classifying ;
@@ -96,6 +98,7 @@ class LinkingAnnotation(Annotation):
                      prov:generated ?existingAnn ;
                      prov:wasAssociatedWith $user .
                   }
+                  ?existingAct dct:isPartOf / ext:codelist ?codelist.
               }
             }
             """)
