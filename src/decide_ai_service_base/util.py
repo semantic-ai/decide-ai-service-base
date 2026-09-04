@@ -341,20 +341,15 @@ def track_file_content(mounts, file, root="/"):
         except json.JSONDecodeError as e:
             print(f"Error reading {file_path}: {e}")
 
-def write_agent_info(service_base: str, agent_suffix:str = ""):
+def write_agent_info(service_base: str, agent_suffix_or_subcomponent:str = ""):
     agent_config_uri = ensure_config_uri()
 
-    agent_uri = ensure_agent_uri(agent_config_uri, service_base, agent_suffix)
+    agent_uri = ensure_agent_uri(agent_config_uri, service_base, agent_suffix_or_subcomponent)
 
-    app.state.agent_uris[agent_suffix] = agent_uri
-    
+    app.state.agent_uris[agent_suffix_or_subcomponent] = agent_uri
 
-def ensure_agent_uri(agent_config_uri, service_base, agent_suffix):
-    separator = ""
-    if agent_suffix and not (agent_suffix.startswith("/") or agent_suffix.startswith("#")):
-        separator = "/"
-
-    service_base=f"{service_base}{separator}{agent_suffix}"
+def ensure_agent_uri(agent_config_uri, service_base, agent_suffix_or_sub_component):
+    [base_agent_uri, is_sub_component] = _build_base_agent_uri(service_base, agent_suffix_or_sub_component)
     q = Template(
         get_prefixes_for_query("foaf", "ext", "schema", "tcs", "prov") +
         """
@@ -369,7 +364,7 @@ def ensure_agent_uri(agent_config_uri, service_base, agent_suffix):
     ).substitute(
         graph=sparql_escape_uri(GRAPHS["jobs"]),
         agent_config_uri=sparql_escape_uri(agent_config_uri),
-        service_base=sparql_escape_uri(service_base)
+        service_base=sparql_escape_uri(base_agent_uri)
     )
 
     result = query(q, sudo=True)
@@ -380,7 +375,9 @@ def ensure_agent_uri(agent_config_uri, service_base, agent_suffix):
         return agent_uri    
 
     agent_id = str(uuid.uuid4())
-    agent_uri = BASE_AGENT_URI + agent_id + separator + agent_suffix
+    agent_uri = BASE_AGENT_URI + agent_id
+    if agent_suffix_or_sub_component and not is_sub_component:
+        agent_uri = agent_uri + "/" + agent_suffix_or_sub_component
     
     q = Template(
         get_prefixes_for_query("foaf", "ext", "schema", "tcs", "prov", "mu") +
@@ -389,7 +386,7 @@ def ensure_agent_uri(agent_config_uri, service_base, agent_suffix):
             GRAPH $graph {
                 $agent_uri a tcs:InstancePipelineComponent, foaf:Agent ;
                     mu:uuid $agent_id ;
-                    prov:specializationOf $service_base ;
+                    prov:specializationOf $base_agent_uri ;
                     ext:hasConfig $agent_config_uri .
             }
         }
@@ -397,11 +394,21 @@ def ensure_agent_uri(agent_config_uri, service_base, agent_suffix):
     ).substitute(
         graph=sparql_escape_uri(GRAPHS["jobs"]),
         agent_config_uri=sparql_escape_uri(agent_config_uri),
-        service_base=sparql_escape_uri(service_base),
+        base_agent_uri=sparql_escape_uri(base_agent_uri),
         agent_id=sparql_escape_string(agent_id),
         agent_uri=sparql_escape_uri(agent_uri)
     )
 
     update(q, sudo=True)
-
+    
     return agent_uri
+
+def _build_base_agent_uri(service_base, agent_suffix_or_sub_component):
+    is_sub_component = False
+    if agent_suffix_or_sub_component:
+        if agent_suffix_or_sub_component.startswith("http://") or agent_suffix_or_sub_component.startswith("https://"):
+            service_base = agent_suffix_or_sub_component
+            is_sub_component = True
+        elif not (agent_suffix_or_sub_component.startswith("/") or agent_suffix_or_sub_component.startswith("#")):
+            service_base=f"{service_base}/{agent_suffix_or_sub_component}"
+    return [service_base, is_sub_component]
