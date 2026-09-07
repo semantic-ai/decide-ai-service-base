@@ -30,6 +30,10 @@ At service startup, services are required to register all their agent uris by ru
 ```python
   write_agent_info("http://lblod.data.gift/id/components/named-entity-linking/v1.0.0")
   # or in case there are multiple agents in this single service:
+  write_agent_info("http://lblod.data.gift/id/components/named-entity-recognition/v1.0.0", "http://lblod.data.gift/id/components/entity-extraction/v1.0.0")
+  write_agent_info("http://lblod.data.gift/id/components/named-entity-recognition/v1.0.0", "http://lblod.data.gift/id/components/segmentation/v1.0.0")
+  write_agent_info("http://lblod.data.gift/id/components/named-entity-recognition/v1.0.0", "http://lblod.data.gift/id/components/translation/v1.0.0")
+  # or if your sub-component uri can be appended to the main uri:
   write_agent_info("http://lblod.data.gift/id/components/named-entity-recognition/v1.0.0", "ner_extractor")
   write_agent_info("http://lblod.data.gift/id/components/named-entity-recognition/v1.0.0", "segmenter")
   write_agent_info("http://lblod.data.gift/id/components/named-entity-recognition/v1.0.0", "translator")
@@ -42,6 +46,8 @@ Once the agents are registered, services can simply call:
 ```python
 get_agent_uri()
 # or in case there are multiple agents in this single service
+get_agent_uri("http://lblod.data.gift/id/components/entity-extraction/v1.0.0")
+# or if your sub-component uri can be appended to the main uri:
 get_agent_uri("ner_extractor")
 ```
 
